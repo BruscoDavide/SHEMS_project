@@ -3,7 +3,9 @@ Environment creation
 
 webserver_api folder
 - django-admin startproject SHEMS_webserver
+
 - python manage.py startapp weather_api ---> OPEN WEATHER MAP
+
 - settings.py-> 
 INSTALLED_APPS = [..., 'mongoapp'] 
 DATABASES = {
@@ -14,6 +16,7 @@ DATABASES = {
 }
 python manage.py makemigrations python manage.py migrate
 ---> DJANGO DB
+
 - certificate and key certificate generation, INSTALLED_APPS = [..., 'mongoapp', 'django_extensions']
 python manage.py makemigrations python manage.py migrate
 python manage.py runserver_plus --cert-file localhost.pem --key-file localhost-key.pem 

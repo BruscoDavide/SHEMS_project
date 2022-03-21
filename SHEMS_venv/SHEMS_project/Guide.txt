@@ -1,0 +1,19 @@
+Environment creation
+- folder creation: SHEMS_project as main root and then a single folder for each microservice
+
+webserver_api folder
+- django-admin startproject SHEMS_webserver
+- python manage.py startapp weather_api ---> OPEN WEATHER MAP
+- settings.py-> 
+INSTALLED_APPS = [..., 'mongoapp'] 
+DATABASES = {
+    'default': {
+        'ENGINE': 'djongo',
+        'NAME': 'SHEMS_test',
+    }
+}
+python manage.py makemigrations python manage.py migrate
+---> DJANGO DB
+- certificate and key certificate generation, INSTALLED_APPS = [..., 'mongoapp', 'django_extensions']
+python manage.py makemigrations python manage.py migrate
+python manage.py runserver_plus --cert-file localhost.pem --key-file localhost-key.pem 

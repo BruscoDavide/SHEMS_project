@@ -16,9 +16,11 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path
 from . import views
+from weather_API.views import weatherAPItest
 
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('getTest', views.getTest, name='getTest'),
-    path('postTest', views.postTest, name='postTest')
+    path('postTest', views.postTest, name='postTest'),
+    path('APItest', weatherAPItest, name = 'APItest')
 ]

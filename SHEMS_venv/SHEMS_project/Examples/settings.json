@@ -1,0 +1,5 @@
+{
+    "broker": "broker.hivemq.com",
+    "port": 1883,
+    "topic": "push_notification_server"
+}

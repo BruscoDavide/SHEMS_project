@@ -1,0 +1,7 @@
+{
+	"broker": "broker.hivemq.com",
+	"port": 1883,
+	"baseTopic": "IoT_project",
+	"topic": "test",
+	"client_topic": "client_test"
+}

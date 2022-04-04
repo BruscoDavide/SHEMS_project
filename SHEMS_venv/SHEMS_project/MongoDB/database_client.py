@@ -1,8 +1,8 @@
-import pymongo as pm
+from pymongo import MongoClient
 import logging
 
 class databaseClient():
-    def __init__(self, name, ip, port = None):
+    def __init__(self, ip = None, port = None):
         """Definition of the database name
 
         Args:
@@ -19,32 +19,34 @@ class databaseClient():
         password="1234",
         )
         """
-
         try:
-            self.client = pm.MongoClient(ip)
-            self.db = self.client.name
-            self.name = name
-            self.collections = []
+            client = MongoClient()
+            self.db = client.SHEMS_database_local       
+            self.collections = ['home_configuration', 'data_collected']
+            self.name = 'SHEMS_database_local'
         except:
             logging.info('MongoDB client creation failed')
-        
-    def myCollection(self, collection_name):
-        """Get or create a collection
+
+    def databasePointer(self, type):
+        if type == 'local':
+            return self.db.SHEMS_database_local
+    
+    def collectionPointer(self, collection_name):
+        """Get or create a collection pointer
 
         Args:
             collection (string): collection name
         Returns:
                 db: the collection get or created
         """
-        try:
-            if collection_name in self.collections:
-                return self.db.collection_name
-            else:
-                self.collections.append(collection_name)           
-        except:
+        if collection_name == 'home_configuration':
+            return self.db.home_configuration
+        elif collection_name == 'data_collected':
+            return self.db.data_collected
+        else:
             logging.info(f'Collection {collection_name} does not created or found')
 
-    def write_myDocument(self, document, collection):
+    def write_document(self, document, collection_name):
         """Insert one or more documents in a specific database collection
 
         Args:
@@ -52,12 +54,12 @@ class databaseClient():
             collection (string): collection name
         """
         try:
-            pointer = self.myCollection(collection)
-            pointer.insert_many(document)
+            pointer = self.collectionPointer(collection_name)
+            pointer.insert_one(document)
         except:
             logging.info('Write document failed')
 
-    def count_myDocuments(self, collection):
+    def count_documents(self, collection_name):
         """Count the number of documents in a specific collection
 
         Args:
@@ -66,12 +68,12 @@ class databaseClient():
                 int: number of documents in the collection
         """
         try:
-            pointer = self.myCollection(collection)
+            pointer = self.collectionPointer(collection_name)
             return list(pointer.count())
         except:
             logging.info('Count document failed')
 
-    def read_myDocuments(self, collection):
+    def read_documents(self, collection_name):
         """Read documents from a specific collection
 
         Args:
@@ -81,12 +83,12 @@ class databaseClient():
             _type_: _description_
         """
         try:
-            pointer = self.myCollection(collection)
+            pointer = self.collectionPointer(collection_name)
             return list(pointer.find({}))
         except:
             logging.info('Read document failed')
 
-    def update_myDocuments(self, collection, ID, object):
+    def update_myDocuments(self, collection_name, ID, object):
         """Update a field of the documents of a collection
 
         Args:
@@ -97,12 +99,12 @@ class databaseClient():
             _type_: _description_
         """
         try:
-            pointer = self.myCollection(collection)
+            pointer = self.collectionPointer(collection_name)
             return list(pointer.update_one(ID, {'$set': object}))
         except:
             logging.info('Update document failed')
 
-    def delete_myDocuments(self, collection, ID):
+    def delete_myDocuments(self, collection_name, ID):
         """delete a documents from a collection
 
         Args:
@@ -112,10 +114,18 @@ class databaseClient():
             _type_: _description_
         """
         try:
-            pointer = self.myCollection(collection)
+            pointer = self.collectionPointer(collection_name)
             return list(pointer.delete_one(ID))
         except:
             logging.info('Delete document failed')
+
+
+
+
+
+
+
+
 
     #TODO: da testare e aggiungere funzoinalità
     def myQuery(self, collection, object, operator= None):
@@ -168,6 +178,3 @@ class databaseClient():
         #db_names = self.client.list_database_names()
         #return server_info, keys, db_names, self.collections
         return self.collections
-
-
-

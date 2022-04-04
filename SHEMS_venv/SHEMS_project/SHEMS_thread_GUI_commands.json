@@ -1,0 +1,80 @@
+{
+    "commands_list": [
+        ### basic command
+        {
+            "command": "home", // get: SHEMS/home
+            "timestamp":datatime object ----> str(hour:minute:second) day from 8 a.m. to 7.59 a.m.
+            # data.json   --> devices/appliances are switched on
+        },
+        ### a botton in home
+        {
+            "command": "other_on_appliances", // get: SHEMS/other_on_appliances
+            "timestamp":datatime object
+            # data.json   --> devices/appliances are switched on
+        },
+        ### basic command
+        {
+            "command": "scheduling", // get: SHEMS/scheduling
+            "timestamp":datatime object
+            # the actual schedling {name:"", periodid:"", consumption:""}
+        },
+        ### a botton in scheduling
+        {
+            "command": "change_scheduling", // post: SHEMS/scheduling/change_scheduling body:payload
+            payload: {
+                "when":"now"/datetime object,
+                "which":"whasginmachine",    
+            }           
+            "timestamp":datatime object
+        },
+        ### basic command 
+        { 
+            "command": "summary", // get: SHEMS/summary?period=day&object=consumption
+            payload:{
+                "period":"day/week/month/year",
+                "object":"consumption/sold/bought/RTP",
+            }
+            "timestamp":datatime object
+            # statististics: xlabel, data:?????? energy consumption / energy sold and bought (DAY, WEEK, single data for mounth, for year)        },
+        },
+        ### basic command
+        {
+            "command": "settings", // post: SHEMS/settings   body:payload
+            "payload":{
+                "action":"change_timestamp",
+                "object":"temperature",
+                "new_value":20
+            }
+            "payload":{
+                "action":"add_appliances"
+                "object":"AC"
+                "...."
+            }
+            "payload":{
+                "action":"delete_appliances"
+                "object":"AC"
+            }
+            "timestamp":datatime object
+            
+            # change a setpoints (temperature min max, tempereature boiler, orario_macchina); 
+            # add or delete an appliances
+        },
+        ### basic command
+        {
+            "command": "community", // get: SHEMS/community?period=day&object=energy_bought
+            payload:{
+                "period":"day/week/month/year",
+                "object":"consumption/sold/bought/RTP"
+            }
+            "timestamp":datatime object
+            #object: energy_bought, energy_sold, 
+            #period: day/week/moth/year
+        },
+        {
+            "command":"registration", // post: SHEMS/registration
+            payload: {{.........}}
+            # family name, comfort parameters: [temperatura minima e massima di boiler e ambiente, ora di partenza della macchina, threasolg minima di carica della macchina], electric vehicle, appliances:[modello, lavatrice-lavastovigle-vacuum cliner]
+        }
+
+    ]
+}

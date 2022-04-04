@@ -1,0 +1,46 @@
+1. alle 8 di mattina primo scheduling per tutto il giorno: un thread con timer in background
+
+2. cambiare lo scheduling real time: o adesso o tempo specificato: {flag: int, appliance: [], start_time:[]}
+====> modify_appliance
+
+-> get_new_instance
+3. cambiare i set point: tmin, tmax per acqua e riscaldamento, ora di partenza al marttino per la macchina: {Tin_max/Tin_min:int;Tewh_max/Tewh_min:int;time_dep:datetime object}
+4. eliminare/aggiungere cose:  {new/deleted, info per appliances}
+
+info per new appliances:
+- name
+- running_len : tempo in timestep necessario a fare la cosa (un timestep min)
+- num_cycles: quante volte fai l'operazione
+- power conusmption: in kw quanto consuma per l'intero task ----> *volessimo automatizzarlo poi ci pensiamo
+- c1: 1 #sempre
+- c2: 2 #sempre
+
+
+3 file diversi per local GUI, web server, prosumer
+{
+    payload: {command:0/1/2: int}, 0: change set point; 1: modify appliance; 3: change delete appliance
+        0: appliance=[], start_time=[]  
+        1: appliance=[uno o più appliance che vuoi spostare], [gli orari a cui fare le cose: -1 = adesso, datetiem object]
+        2: appliance = [], start_time=[]
+
+    timestamp: datetime object
+}
+_______________________________________________________________________________________________
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

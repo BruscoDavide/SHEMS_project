@@ -21,7 +21,7 @@ if __name__ == '__main__':
         filemode='w'
     )
 
-    with open('settings.json') as json_data:
+    with open('starting_configuration.json') as json_data:
         d = json.load(json_data)
         json_data.close()
         logging.info(f'settings.json: {d}')

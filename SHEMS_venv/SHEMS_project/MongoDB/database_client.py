@@ -84,7 +84,11 @@ class databaseClient():
         """
         try:
             pointer = self.collectionPointer(collection_name)
-            return list(pointer.find(document))
+
+            d = {}
+            for i in pointer.find(document):
+                d=i
+            return d
         except:
             logging.info('Read document failed')
 

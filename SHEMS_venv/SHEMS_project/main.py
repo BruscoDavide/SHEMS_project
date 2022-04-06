@@ -4,7 +4,7 @@ import requests
 import numpy as np
 
 from Utilities.timer import perpetualTimer
-from Utilities.mqttclient import MQTTSubscriber
+from Utilities.mqttclient import MQTTSubscriber, MQTTPublisher
 from MongoDB.database_client import databaseClient
 from Optimization_model.Simulator.instance import Instance
 from Optimization_model.LP_solver.SHEMSfile import SHEMS
@@ -19,21 +19,24 @@ class SHEMS_main():
         Returns:
             SHEMS_main object
         """
+        # Energy optimization model
         self.databaseClient = databaseClient()
         new_instance = Instance() # TODO: da aggiungere a instance costruttore data = new_databaseClient.read_myDocuments() 
         self.shems = SHEMS(new_instance)
         
+        # Sensors subscribers MQYY
         self.waterWithdrawn_topic = cfg['waterWithdrawn_topic']
         self.carStation_topic = cfg['carStation_topic']
         self.deviceID = np.random.randint(1000000000)
         self.broker = cfg['mqtt_broker']
         self.port = cfg['mqtt_port']
-        sensors_subscriber = MQTTSubscriber(self.deviceID, self.broker, self.port)
-        sensors_subscriber.start()
-        sensors_subscriber.callbackRegistration(self.sensors_subscriver_callback)
-        sensors_subscriber.mySubscribe(self.waterWithdrawn_topic)
-        sensors_subscriber.mySubscribe(self.carStation_topic)
+        self.sensors_subscriber = MQTTSubscriber(self.deviceID, self.broker, self.port)
+        self.sensors_subscriber.start()
+        self.sensors_subscriber.callbackRegistration(self.sensorsSubscriber_callback)
+        self.sensors_subscriber.mySubscribe(self.waterWithdrawn_topic)
+        self.sensors_subscriber.mySubscribe(self.carStation_topic)
 
+        # Weather forecast API
         self.city = cfg['home_city']
         self.country_code=cfg['country_code']
         self.BASE_URL1 = cfg['BASE_URL1']
@@ -48,6 +51,22 @@ class SHEMS_main():
         else:
             logging.info(f'Error city coordinates recovering: {response.status_code}')
 
+        # Push notification
+        self.server_topic = cfg['server_topic'] # LO USO PER ANDARE VERSO IL SERVER
+        self.client_topic = cfg['client_topic'] # LO USO PER ANDARE VERSO IL CLIENT FINALE, CIOè LA GUI
+        self.serverID_publisher = 'publisher_server'
+        self.myserver_publisher = MQTTPublisher(self.serverID_publisher, self.broker, self.port)
+        self.myserver_publisher.start()
+        self.serverID_subscriber = 'subscriber_server'
+        self.myserver_subscriber = MQTTSubscriber(self.serverID_subscriber, self.broker, self.port)
+        self.myserver_subscriber.start()
+        self.myserver_subscriber.callbackRegistration(self.myserver_subscriber_callback)
+        self.myserver_subscriber.mySubscribe(self.server_topic)
+        
+        self.homeID_publisher = 'publisher_home'
+        self.home_publisher = MQTTPublisher(self.homeID_publisher, self.broker, self.port)
+        self.home_publisher.start()
+
     def basicScheduling_thread_callback(self):
         """First day scheduling, done at 8:00 a.m. 
         """    
@@ -55,10 +74,12 @@ class SHEMS_main():
 
         cod = self.shems.solve()
         if cod == 2:
-            pass
-            #TODO: push notification
+            try:
+                self.home_publisher.myPublish(self.server_topic, 'First scheduling of the day having success')
+            except:
+                logging.info('Error of the home during sending push notification message to the server')
         elif cod == -1:
-            logging.info('First day scheduling failed')
+            logging.info('First scheduling of the day failed')
     
     def weatherAPI(self):
         """Open weather map call to retrive temperature forecast for the day. Stores the results in the database
@@ -150,7 +171,6 @@ class SHEMS_main():
             # TODO:check timestamp
             
             if i['command']=='home':
-                # TODO: databaseClient torna una lista!!!! io voglio un dizionario DA FARE PER TUTTI O FAR PASSARE DIRETTAMENTE UN DIZIONARIO
                 data = self.databaseClient.read_documents(collection_name='data_collected', document={'_id':'home'})
                 self.append_data(code=timestamp, data=data)    
             elif i['command']=='appliances':
@@ -263,6 +283,13 @@ class SHEMS_main():
             fp.close()
         except:
             logging.info('Error during the reading of the "main.py" command response') 
+
+    def myserver_subscriber_callback(self, msg):
+        # TODO:contronllo del messaggio, piccola encriptazione del messaggio
+        try:
+            self.myserver_publisher.myPublish(self.client_topic, msg.payload)
+        except:
+            logging.info('Error of the push notification server')
 
 if __name__ == '__main__':
     

@@ -1,4 +1,5 @@
-{
+[{
+	"_id":0,
 	"home_setpoints": {
 		"U_val": 0.9,
 		"Pac_max": 10,
@@ -10,7 +11,10 @@
 		"Tewh_min": 48,
 		"Tset_off": 19,
 		"Tset_off_wat": 21
-	},
+	}
+},
+{
+	"_id": 1,
 	"outside_measure": {
 		"Tcw": [
 			21.0,
@@ -407,13 +411,19 @@
 			0.01,
 			0.035
 		]
-	},
+	}
+},
+{
+	"_id": 2,
 	"hw": {
 		"R": 15,
 		"boiler_vol": 200,
 		"boiler_radius": 0.25,
 		"Cp": 1
-	},
+	}
+},
+{
+	"_id": 3,
 	"batteries": {
 		"disch_eff_ESS": 0.92,
 		"disch_eff_PEV": 0.92,
@@ -431,7 +441,10 @@
 		"Cpev_thresh_high": 0.8,
 		"Cess_init": 3.5,
 		"Cpev_init": 12
-	},
+	}
+},
+{
+	"_id":4,
 	"appliances": {
 		"N_sched_appliances": 2,
 		"sched_appliances": {
@@ -506,7 +519,10 @@
 				2
 			]
 		}
-	},
+	}
+},
+{
+	"_id":5,
 	"energy": {
 		"daily_mean_EA": [
 			1.0,
@@ -707,7 +723,10 @@
 			1.4
 		],
 		"Pdr": 10
-	},
+	}
+},
+{
+	"_id": 6,
 	"RTP": {
 		"values": [
 			0.14,
@@ -812,7 +831,10 @@
 		"RTPess_dis": 0.10742187500000001,
 		"RTPpev_dis": 0.115234375,
 		"RTPpev_ch": 0
-	},
+	}
+},
+{
+	"_id":7,
 	"time": {
 		"time_granularity": 15,
 		"time_dep": 93,
@@ -820,3 +842,4 @@
 		"tn_end": 0
 	}
 }
+]

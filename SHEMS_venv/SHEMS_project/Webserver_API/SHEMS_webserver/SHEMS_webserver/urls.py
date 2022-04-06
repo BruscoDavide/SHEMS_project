@@ -1,26 +1,15 @@
-"""SHEMS_webserver URL Configuration
-
-The `urlpatterns` list routes URLs to views. For more information please see:
-    https://docs.djangoproject.com/en/4.0/topics/http/urls/
-Examples:
-Function views
-    1. Add an import:  from my_app import views
-    2. Add a URL to urlpatterns:  path('', views.home, name='home')
-Class-based views
-    1. Add an import:  from other_app.views import Home
-    2. Add a URL to urlpatterns:  path('', Home.as_view(), name='home')
-Including another URLconf
-    1. Import the include() function: from django.urls import include, path
-    2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
-"""
 from django.contrib import admin
 from django.urls import path
 from . import views
-from weather_API.views import weatherAPItest
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('getTest', views.getTest, name='getTest'),
-    path('postTest', views.postTest, name='postTest'),
-    path('APItest', weatherAPItest, name = 'APItest')
+    path('SHEMS/home', views.home, name = 'SHEMS/home'),
+    path('SHEMS/appliances', views.appliances, 'SHEMS/appliances'),
+    path('SHEMS/scheduling', views.scheduling, name='SHEMS/scheduling'),
+    path('SHEMS/changeScheduling', views.changeScheduling, name='SHEMS/changeScheduling'),
+    path('SHEMS/summary', views.summary, name='SHEMS/summary'),
+    path('SHEMS/settings',  views.settings, name='SHEMS/settings'),
+    path('SHEMS/community', views.community, name='SHEMS/community'),
+    path('SHEMS/registration', views.registration, name='SHEMS/registration')
 ]

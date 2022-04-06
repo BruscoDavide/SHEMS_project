@@ -11,6 +11,14 @@ from Optimization_model.LP_solver.SHEMSfile import SHEMS
 
 class SHEMS_main():
     def __init__(self, cfg):
+        """SHEMS system object. It includes the instance of the energy optimization toll, the instance of the MQTT subscriber and publisher and the instance of the push notificator
+
+        Args:
+            cfg (dict): configuration file
+        
+        Returns:
+            SHEMS_main object
+        """
         self.databaseClient = databaseClient()
         new_instance = Instance() # TODO: da aggiungere a instance costruttore data = new_databaseClient.read_myDocuments() 
         self.shems = SHEMS(new_instance)
@@ -27,148 +35,234 @@ class SHEMS_main():
         sensors_subscriber.mySubscribe(self.carStation_topic)
 
         self.city = cfg['home_city']
+        self.country_code=cfg['country_code']
         self.BASE_URL1 = cfg['BASE_URL1']
         self.BASE_URL2 = cfg['BASE_URL2']
         self.API_KEY = cfg['API_KEY']
+        limit = 1
+        url = f"http://api.openweathermap.org/geo/1.0/direct?q={self.city},{self.country_code}&limit={limit}&appid={self.API_KEY}"
+        response = requests.get(url)
+        if response.status_code == 200:
+            self.lat = int(response.json()['lat'])
+            self.lon = int(response.json()['lon'])
+        else:
+            logging.info(f'Error city coordinates recovering: {response.status_code}')
 
-    def SHEMS_thread_basic_scheduling_callback(self):
-        """First day scheduling 
+    def basicScheduling_thread_callback(self):
+        """First day scheduling, done at 8:00 a.m. 
         """    
         self.weatherAPI()
 
         cod = self.shems.solve()
         if cod == 2:
-            logging.info('First day schedluinig success')
+            pass
+            #TODO: push notification
         elif cod == -1:
             logging.info('First day scheduling failed')
-        # TODO: inserire feedback utente        
-
-    def SHEMS_thread_callback(self):
-        """USer operation on: setting parameters/appliances and change scheduling
-        """
-        fp = open('SHEMS_thread_file.json', 'r')
-        file = json.load(fp)
-        fp.close()
-        timestamp = file['timestamp']
-        # TODO: controllo timestamp sia corretto
-        payload = file['payload']
-        if payload['command'] == 0:
-            self.databaseClient.update_myDocuments('home_configuration', {'home_configuration_id':0}, payload)
-            self.shems.set_working_mode(payload)
-            cod = self.shems.solve()
-            if cod == 2:
-                logging.info('First day schedluinig success')
-            elif cod == -1:
-                logging.info('First day scheduling failed')
-            # TODO: inserire feedback utente
-        elif payload['command'] == 1:
-            self.shems.set_working_mode(payload)
-            cod = self.shems.solve()
-            if cod == 2:
-                logging.info('First day schedluinig success')
-            elif cod == -1:
-                logging.info('First day scheduling failed')
-            # TODO: inserire feedback utente
     
-        elif payload['command'] == 2:
-            self.databaseClient.update_myDocuments('home_configuration', {'home_configuration_id':0}, payload) #payload = {:}
-            #self.databaseClient.delete_myDocuments('home_configuration', {'home_configuration_id':0}, payload)
-            self.databaseClient.write_document('home_configuration', {'home_configuration_id':0}, payload)
-            # TODO: capire se nuovo o elimino appliances
-            self.shems.set_working_mode(payload)
-            scod = self.shems.solve()
-            if cod == 2:
-                logging.info('First day schedluinig success')
-            elif cod == -1:
-                logging.info('First day scheduling failed')
-            # TODO: inserire feedback utente
-        else:
-            raise logging.info('Command code error')  
+    def weatherAPI(self):
+        """Open weather map call to retrive temperature forecast for the day. Stores the results in the database
+        """
+        url = f'{self.BASE_URL2}lat={self.lat}&lon={self.lon}&appid={self.API_KEY}'
+        response = requests.get(url)
+        
+        temp = []
+        if response.status_code == 200:  # checking the status code of the request
+            data = response.json()['list'] # una lista
+            for i in range(8): #24/3, data recovering: temperature every 3 hours
+                temp.append(round(data[i]['main']['temp']-273, 1))
 
-    def sensors_subscriver_callback(self, msg):
+            new_temp = np.zeros(95)
+            for i in range(7): # 0-6, data every 1 hour
+                new_temp[i*12]=temp[i]
+                new_temp[i*12+1] = round(temp[i]-(temp[i]-temp[i+1])/12, 1)
+                new_temp[i*12+2] = round(temp[i]-2*(temp[i]-temp[i+1])/12, 1)
+                new_temp[i*12+3] = round(temp[i]-3*(temp[i]-temp[i+1])/12, 1)
+                new_temp[i*12+4] = round(temp[i]-4*(temp[i]-temp[i+1])/12, 1)
+                new_temp[i*12+5] = round(temp[i]-5*(temp[i]-temp[i+1])/12, 1)
+                new_temp[i*12+6] = round(temp[i]-6*(temp[i]-temp[i+1])/12, 1)
+                new_temp[i*12+7] = round(temp[i]-7*(temp[i]-temp[i+1])/12, 1)
+                new_temp[i*12+8] = round(temp[i]-8*(temp[i]-temp[i+1])/12, 1)
+                new_temp[i*12+9] = round(temp[i]-9*(temp[i]-temp[i+1])/12, 1)
+                new_temp[i*12+10] = round(temp[i]-10*(temp[i]-temp[i+1])/12, 1)
+                new_temp[i*12+11] = round(temp[i]-11*(temp[i]-temp[i+1])/12, 1)
+            new_temp[84] = temp[7]
+            if new_temp[83]<new_temp[84]: # crescente
+                new_temp[85] = new_temp[84] + round((temp[6]-temp[7])/12, 1)
+                new_temp[86] = new_temp[84] + 2*round((temp[6]-temp[7])/12, 1)
+                new_temp[87] = new_temp[84] + 3*round((temp[6]-temp[7])/12, 1)
+                new_temp[88] = new_temp[84] + 4*round((temp[6]-temp[7])/12, 1)
+                new_temp[89] = new_temp[84] + 5*round((temp[6]-temp[7])/12, 1)
+                new_temp[90] = new_temp[84] + 6*round((temp[6]-temp[7])/12, 1)
+                new_temp[91] = new_temp[84] + 7*round((temp[6]-temp[7])/12, 1)
+                new_temp[92] = new_temp[84] + 8*round((temp[6]-temp[7])/12, 1)
+                new_temp[93] = new_temp[84] + 9*round((temp[6]-temp[7])/12, 1)
+                new_temp[94] = new_temp[84] + 10*round((temp[6]-temp[7])/12, 1)
+                new_temp[95] = new_temp[84] + 11*round((temp[6]-temp[7])/12, 1)
+            else: # decrescente
+                new_temp[85] = new_temp[84] - round((temp[6]-temp[7])/12, 1)
+                new_temp[86] = new_temp[84] - 2*round((temp[6]-temp[7])/12, 1)
+                new_temp[87] = new_temp[84] - 3*round((temp[6]-temp[7])/12, 1)
+                new_temp[88] = new_temp[84] - 4*round((temp[6]-temp[7])/12, 1)
+                new_temp[89] = new_temp[84] - 5*round((temp[6]-temp[7])/12, 1)
+                new_temp[90] = new_temp[84] - 6*round((temp[6]-temp[7])/12, 1)
+                new_temp[91] = new_temp[84] - 7*round((temp[6]-temp[7])/12, 1)
+                new_temp[92] = new_temp[84] - 8*round((temp[6]-temp[7])/12, 1)
+                new_temp[93] = new_temp[84] - 9*round((temp[6]-temp[7])/12, 1)
+                new_temp[94] = new_temp[84] - 10*round((temp[6]-temp[7])/12, 1)
+                new_temp[95] = new_temp[84] - 11*round((temp[6]-temp[7])/12, 1)
+            
+            data = self.databaseClient.read_documents(collection_name='home_configuration', document={'_id':1})
+            data['Tout']=new_temp
+            self.databaseClient.update_documents(collection_name='home_configuration', document={'_id':1}, object=data)
+        else:
+            logging.info(f'Weather forecast API response status code: {response.status_code}')    
+
+    def sensorsSubscriber_callback(self, msg):
+        """Subscriber fot car station and hot water usage
+
+        Args:
+            msg (MQTT msg): 
+        """
         if msg.topic == self.waterWithdrawn_topic:
             new_data = msg.payload['waterFlux']
             # TODO: inserire controllo sul valore
             # TODO: scrivo sul database o cosa??
-        elif msg.topic == self.arStation_topic:
+        elif msg.topic == self.carStation_topic:
             if msg.payload['carStation'] == 0 or msg.payload['carStation'] == 1:
                 new_data = msg.payload['carStation']
                 # TODO: scrivo sul database o cosa??
             else: 
-                raise logging.info('Error in the carStation publisher')
-
-    def weatherAPI(self):
-        #country_code="380"
-        #limit = 1
-        #url = f"http://api.openweathermap.org/geo/1.0/direct?q={self.city},{country_code}&limit={limit}&appid={self.api_key}"
-        #response = requests.get(url)
-        #if response.status_code == 200:
-            #recupero delle coordinate
-
-        lat = 45.0677551 # Torino
-        lon = 7.6824892
-        url = self.BASE_URL2 + "&appid=" + self.API_KEY
-        response = requests.get(url)
-        temp = []
-        if response.status_code == 200:  # checking the status code of the request
-            data = response.json()['list'] # una lista
-            
-            for i in range(8): #24/3, data recovering: temperature every 3 hours
-                temp.append(round(data[i]['main']['temp']-273, 1))
-            new_temp = np.zeros(24)
-            
-            for i in range(7): # 0-6, data every 1 hour
-                new_temp[i*3]=temp[i]
-                new_temp[i*3+1] = round(temp[i]-(temp[i]-temp[i+1])/3, 1)
-                new_temp[i*3+2] = round(temp[i]-2*(temp[i]-temp[i+1])/3, 1)
-            new_temp[21] = temp[7]
-            if new_temp[20]<new_temp[21]: # crescente
-                new_temp[22] = new_temp[21] + round((temp[7]-temp[6])/3, 1)
-                new_temp[23] = new_temp[21] + 2*round((temp[7]-temp[6])/3, 1)
-            else: # decrescente
-                new_temp[22] = new_temp[21] - round((temp[7]-temp[6])/3, 1)
-                new_temp[23] = new_temp[21] - 2*round((temp[7]-temp[6])/3, 1)
-
-            temp = new_temp
-            new_temp = np.zeros(96)
-            for i in range(23): # 0-6, data every 15 minutes
-                new_temp[i*4]=temp[i]
-                new_temp[i*4+1] = round(temp[i]-(temp[i]-temp[i+1])/4, 1)
-                new_temp[i*4+2] = round(temp[i]-2*(temp[i]-temp[i+1])/4, 1)
-                new_temp[i*4+3] = round(temp[i]-3*(temp[i]-temp[i+1])/4, 1)
-            new_temp[92] = temp[23]
-            if new_temp[91]<new_temp[92]: # crescente
-                new_temp[93] = new_temp[92] + round((temp[23]-temp[22])/4, 1)
-                new_temp[94] = new_temp[92] + 2*round((temp[23]-temp[22])/4, 1)
-                new_temp[95] = new_temp[92] + 3*round((temp[23]-temp[22])/4, 1)
-            else: # decrescente
-                new_temp[93] = new_temp[92] - round((temp[23]-temp[22])/4, 1)
-                new_temp[94] = new_temp[92] - 2*round((temp[23]-temp[22])/4, 1)
-                new_temp[95] = new_temp[92] - 2*round((temp[23]-temp[22])/4, 1)
-
-            # TODO: update del database con le temperature e update dei dati vari climatici
-
+                logging.info('Error in the carStation publisher')
         else:
-            logging.info(f'Weather forecast API response status code: {response.status_code}')
+            logging.info(f'Error in the topic: {msg.topic}')
+
+    def GUI_thread_callback(self):
+        """Command manager. It reads the commands from the web server and provide to them a response 
+        """
+        fp = open('GUI_thread_commands.json', 'r')
+        file = json.load(fp)
+        fp.close()
+
+        commands = file['commands_list']
+        for i in commands:
+            timestamp = i['timestamp']
+            # TODO:check timestamp
+            
+            if i['command']=='home':
+                # TODO: databaseClient torna una lista!!!! io voglio un dizionario DA FARE PER TUTTI O FAR PASSARE DIRETTAMENTE UN DIZIONARIO
+                data = self.databaseClient.read_documents(collection_name='data_collected', document={'_id':'home'})
+                self.append_data(code=timestamp, data=data)    
+            elif i['command']=='appliances':
+                data = self.databaseClient.read_documents(collection_name='data_collected', document={'_id':'home'})
+                self.append_data(code=timestamp, data=data)
+            elif i['command']=='scheduling':
+                data = self.databaseClient.read_documents(collection_name='data_collected', document={'_id':'actual_scheduling'})
+                self.append_data(code=timestamp, data=data)
+            elif i['command']=='changeScheduling':
+                payload = i['payload'] 
+                # TODO: check payload format, ricevo when and which e to a stefan che cosa???
+
+                self.shems.set_working_mode(payload)
+                cod = self.shems.solve()
+                if cod == 2:
+                    self.append_data(code=timestamp, data={'response':'Changing schedluinig success, new scheduling'})
+                elif cod == -1:
+                    logging.info('Changing scheduling failed, no new scheduling')
+                    self.append_data(code=timestamp, data={'response':'Changing schedluinig failed, no new scheduling'})
+            elif i['command']=='summary':
+                payload = i['payload']
+                # TODO: lettura diretta dal database più figa, ho a disposione when and which
+                data = self.databaseClient.read_documents(collection_name='data_collected', document={'_id':'history'})
+                # TODO: xlabel glielo passo a posta o se lo ricava lui
+                self.append_data(code=timestamp, data=data)
+            elif i['command']=='changeSetpoints':
+                payload = i['payload']
+                # TODO: check payload format devo avere action and new_value
+                self.databaseClient.update_documents('home_configuration', {'_id':0}, payload)
+
+                self.shems.set_working_mode(payload)
+                cod = self.shems.solve()
+                if cod == 2:
+                    self.append_data(code=timestamp, data={'response':'Updating setpoint success, new scheduling'})
+                elif cod == -1:
+                    logging.info('Updating setpoint failed, no new scheduling')
+                    self.append_data(code=timestamp, data={'response':'Updating setpoint failed, no new scheduling'})
+            elif i['command']=='addAppliances':
+                payload = i['payload']
+                # TODO: check payload format, appliancesData
+                data = self.databaseClient.read_documents(collection_name='home_configuration', document={'_id':4})
+                data['N_sched_appliances'] += 1
+                data['sched_appliances']['name'].append(payload['name'])
+                data['sched_appliances']['running_len_original'].append(payload['running_len_original'])
+                data['sched_appliances']['running_len'].append(payload['running_len'])
+                data['sched_appliances']['num_cycles'].append(payload['num_cycles'])
+                data['sched_appliances']['power_cons'].append(payload['power_cons'])
+                data['sched_appliances']['c1'].append(payload['c1'])
+                data['sched_appliances']['c2'].append(payload['c2'])
+                self.databaseClient.update_documents('home_configuration', {'_id':4}, data)
+
+                self.shems.set_working_mode(payload)
+                cod = self.shems.solve()
+                if cod == 2:
+                    self.append_data(code=timestamp, data={'response':'Updating appliances list success, new scheduling'})
+                elif cod == -1:
+                    logging.info('Updating appliances list failed, no new scheduling')
+                    self.append_data(code=timestamp, data={'response':'Updating appliances list failed, no new scheduling'})
+            elif i['command']=='deleteAppliances':
+                payload = i['payload']
+                # TODO: check payload format
+                data = self.client.read_documents(collection_name='home_configuration', document={'_id':4})
+
+                data['N_sched_appliances'] -= 1
+                for i in data['sched_appliances']['name']:
+                    if i == payload['name']:
+                        data['sched_appliances']['name'].pop(i)
+                        data['sched_appliances']['running_len_original'].pop(i)
+                        data['sched_appliances']['running_len'].pop(i)
+                        data['sched_appliances']['num_cycles'].pop(i)
+                        data['sched_appliances']['power_cons'].pop(i)
+                        data['sched_appliances']['c1'].pop(i)
+                        data['sched_appliances']['c2'].pop(i)
+                        res = self.client.delete_documents(collection_name='home_configuration', document={'_id':4}) #TODO: cosa ne faccio di res
+                        self.databaseClient.write_document(document = data, collection_name='home_configuration')
+                        self.shems.set_working_mode(payload)
+                        cod = self.shems.solve()
+                        if cod == 2:
+                            self.append_data(code=timestamp, data={'response':'Updating appliances list success, new scheduling'})
+                        elif cod == -1:
+                            logging.info('Updating appliances list failed')
+                            self.append_data(code=timestamp, data={'response':'Updating appliances list failed, no new scheduling'})
+                    else:
+                        logging.info('Error appliances name wrong, not found')
+            elif i['command']=='community':
+                payload = i['payload']
+                # TODO: check payload format, period and object
+                data = self.client.read_documents(collection_name='community', document={}) #!!!!!!!
+                self.append_data(command='summary', data=data)
+            elif i['command']=='registration':
+                # TODO:check payload format
+                payload = i['payload']
+                self.databaseClient.update_documents('home_configuration', {'_id':4}, payload) # !!!!!!
+
+    def append_data(self, code, data):
+        """Append data to GUI_thread_data.json
     
+        Args:
+            code: webserver reception command timestamp: command_list[i]['timestamp'] 
+            data (dict): data response
+        """
+        try:
+            fp = open('GUI_thread_data.json', 'r')
+            file = json.load(fp)
+            fp.close()
 
-
-
-
-def reading_json_callback2():
-    fp = open('test2.json', 'r')
-    file = json.load(fp)
-    fp.close()
-    # i perform something... 
-    print(file)
-    #open file, write on it
-
-
-def reading_json_callback3():
-    fp = open('test3.json', 'r')
-    file = json.load(fp)
-    fp.close()
-    print(file)   
+            file['responses'][code] = data
+            fp = open('GUI_thread_data.json', 'w')
+            json.dump(file,fp)
+            fp.close()
+        except:
+            logging.info('Error during the reading of the "main.py" command response') 
 
 if __name__ == '__main__':
     
@@ -180,32 +274,17 @@ if __name__ == '__main__':
         filemode='w'
     )
 
-    fp = open('starting_configuration.json', 'r')
+    fp = open('./files/starting_configuration.json', 'r')
     cfg = json.load(fp)
     fp.close()
 
     main = SHEMS_main(cfg)
 
-    t = 60  #24*60*60
-    SHEMS_thread_basic_scheduling = perpetualTimer(t, main.SHEMS_thread_basic_scheduling_callback(main.shems))
+    SHEMS_thread_basic_scheduling = perpetualTimer(t=60, hFunction=main.basicScheduling_thread_callback) #24*60*60 = one day
     SHEMS_thread_basic_scheduling.start()
 
-    t = 1
-    SHEMS_thread = perpetualTimer(t, main.SHEMS_thread_callback(main.shems))
-    SHEMS_thread.start()
-
-
-
-
-
-
-    # sia local gui che web server scrivono li: ho 3 task da gestire suoi
-
-    GUI = perpetualTimer(t=0.5, reading_json_callback2)
-    GUI.start()
-
-    test = perpetualTimer(t, main.reading_json_callback3)
-    test.start()
+    GUIcommands = perpetualTimer(t=0.5, hFunction=main.GUI_thread_callback)
+    GUIcommands.start()
 
     while True:
         pass

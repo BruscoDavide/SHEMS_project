@@ -1,0 +1,23 @@
+GUI_thread_commands.json
+{
+    "commands_list": [
+        {"command":"",
+         "timestamp":"",
+         "payload":{}
+        },
+        {},
+        ...
+    ]
+}
+
+GUI_thread_data.json
+{
+    "responses": {
+        timestamp:{
+            "command":"",
+            "payload":{}
+        },
+        {},
+        ...
+    }
+}

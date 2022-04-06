@@ -73,7 +73,7 @@ class databaseClient():
         except:
             logging.info('Count document failed')
 
-    def read_documents(self, collection_name):
+    def read_documents(self, collection_name, document):
         """Read documents from a specific collection
 
         Args:
@@ -84,11 +84,11 @@ class databaseClient():
         """
         try:
             pointer = self.collectionPointer(collection_name)
-            return list(pointer.find({}))
+            return list(pointer.find(document))
         except:
             logging.info('Read document failed')
 
-    def update_myDocuments(self, collection_name, ID, object):
+    def update_documents(self, collection_name, document, object):
         """Update a field of the documents of a collection
 
         Args:
@@ -100,11 +100,11 @@ class databaseClient():
         """
         try:
             pointer = self.collectionPointer(collection_name)
-            return list(pointer.update_one(ID, {'$set': object}))
+            return list(pointer.update_one(document, {'$set': object}))
         except:
             logging.info('Update document failed')
 
-    def delete_myDocuments(self, collection_name, ID):
+    def delete_documents(self, collection_name, document):
         """delete a documents from a collection
 
         Args:
@@ -115,7 +115,7 @@ class databaseClient():
         """
         try:
             pointer = self.collectionPointer(collection_name)
-            return list(pointer.delete_one(ID))
+            return list(pointer.delete_one(document))
         except:
             logging.info('Delete document failed')
 

@@ -1,6 +1,0 @@
-How to work with mongoDB:
-
-I'm using 'MongoDB compass' as manager environment, I like it very much. Using it
-you need to connect to localhost, just pressing 'connect' without inserting any ip
-and creat a new database, only the first time, called 'SHEMS_database'.
-then try the code 'mongoDB_client_simulator.py'.

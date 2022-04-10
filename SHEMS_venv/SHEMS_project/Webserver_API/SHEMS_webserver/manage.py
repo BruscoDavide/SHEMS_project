@@ -2,6 +2,7 @@
 """Django's command-line utility for administrative tasks."""
 import os
 import sys
+import logging
 
 
 def main():
@@ -19,4 +20,12 @@ def main():
 
 
 if __name__ == '__main__':
+    log_name = './logs/webserver.log'
+    logging.basicConfig(
+        filename=log_name,
+        format='%(asctime)s %(levelname)s: %(message)s',
+        level=logging.INFO, datefmt="%H:%M:%S",
+        filemode='w'
+    )
+
     main()

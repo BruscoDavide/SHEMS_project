@@ -1,3 +1,6 @@
 {
-    "commands_list": []
+    "commands_list": [
+        {"command":"home",
+        "timestamp":"16:26:10"}
+    ]
 }

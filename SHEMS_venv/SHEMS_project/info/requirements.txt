@@ -1,0 +1,6 @@
+django
+mongodb
+djongo
+pymongo
+numpy
+paho

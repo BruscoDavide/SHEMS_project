@@ -3,11 +3,11 @@ import logging
 import requests
 import numpy as np
 
-from Utilities.timer import perpetualTimer
-from Utilities.mqttclient import MQTTSubscriber, MQTTPublisher
-from MongoDB.database_client import databaseClient
-from Optimization_model.Simulator.instance import Instance
-from Optimization_model.LP_solver.SHEMSfile import SHEMS
+from utilities.timer import perpetualTimer
+from utilities.mqttclient import MQTTSubscriber, MQTTPublisher
+from mongoDB.database_client import databaseClient
+from optimizationModel.Simulator.instance import Instance
+from optimizationModel.LP_solver.SHEMSfile import SHEMS
 
 class SHEMS_main():
     def __init__(self, cfg):
@@ -15,18 +15,16 @@ class SHEMS_main():
 
         Args:
             cfg (dict): configuration file
-        
-        Returns:
-            SHEMS_main object
         """
         # Energy optimization model
         self.databaseClient = databaseClient()
         new_instance = Instance() # TODO: da aggiungere a instance costruttore data = new_databaseClient.read_myDocuments() 
         self.shems = SHEMS(new_instance)
         
-        # Sensors subscribers MQYY
+        # Sensors subscribers MQTT
         self.waterWithdrawn_topic = cfg['waterWithdrawn_topic']
         self.carStation_topic = cfg['carStation_topic']
+        self.smartMeter_topic = cfg['smartmeter_topic']
         self.deviceID = np.random.randint(1000000000)
         self.broker = cfg['mqtt_broker']
         self.port = cfg['mqtt_port']
@@ -35,6 +33,7 @@ class SHEMS_main():
         self.sensors_subscriber.callbackRegistration(self.sensorsSubscriber_callback)
         self.sensors_subscriber.mySubscribe(self.waterWithdrawn_topic)
         self.sensors_subscriber.mySubscribe(self.carStation_topic)
+        self.sensors_subscriber.mySubscribe(self.smartMeter_topic)
 
         # Weather forecast API
         self.city = cfg['home_city']
@@ -146,29 +145,37 @@ class SHEMS_main():
             msg (MQTT msg): 
         """
         if msg.topic == self.waterWithdrawn_topic:
-            new_data = msg.payload['waterFlux']
+            new_data = msg.payload
             # TODO: inserire controllo sul valore
             # TODO: scrivo sul database o cosa??
         elif msg.topic == self.carStation_topic:
-            if msg.payload['carStation'] == 0 or msg.payload['carStation'] == 1:
-                new_data = msg.payload['carStation']
+            if msg.payload == 0 or msg.payload == 1:
+                new_data = msg.payload
                 # TODO: scrivo sul database o cosa??
             else: 
                 logging.info('Error in the carStation publisher')
+        elif msg.topic == self.smartMeter_topic:
+            data = self.client.read_documents(collection_name='home_configuration', document={'_id':6})
+            data['values']=msg.payload
+            self.databaseClient.update_documents('home_configuration', {'_id':6}, data)
         else:
             logging.info(f'Error in the topic: {msg.topic}')
 
     def GUI_thread_callback(self):
-        """Command manager. It reads the commands from the web server and provide to them a response 
+        """Command manager. It reads the commands from the web server and provide to them a response
+        payload = {'command':0/1/2, appliance:[], start_time:[]}
+        0 = change setpoint
+        1 = modify shcduling
+        2: change delete appliance 
         """
-        fp = open('GUI_thread_commands.json', 'r')
+        fp = open('./files/GUI_thread_commands.json', 'r')
         file = json.load(fp)
         fp.close()
 
         commands = file['commands_list']
         for i in commands:
             timestamp = i['timestamp']
-            # TODO:check timestamp
+            # TODO:check timestamp (più tardi)
             
             if i['command']=='home':
                 data = self.databaseClient.read_documents(collection_name='data_collected', document={'_id':'home'})
@@ -181,7 +188,7 @@ class SHEMS_main():
                 self.append_data(code=timestamp, data=data)
             elif i['command']=='changeScheduling':
                 payload = i['payload'] 
-                # TODO: check payload format, ricevo when and which e to a stefan che cosa???
+                payload['command']=1
 
                 self.shems.set_working_mode(payload)
                 cod = self.shems.solve()
@@ -191,15 +198,34 @@ class SHEMS_main():
                     logging.info('Changing scheduling failed, no new scheduling')
                     self.append_data(code=timestamp, data={'response':'Changing schedluinig failed, no new scheduling'})
             elif i['command']=='summary':
+                # TODO: check data stored on database
                 payload = i['payload']
-                # TODO: lettura diretta dal database più figa, ho a disposione when and which
-                data = self.databaseClient.read_documents(collection_name='data_collected', document={'_id':'history'})
+                requiredData = []
+                if payload['when'] == 'day':
+                    data = self.databaseClient.read_documents(collection_name='data_collected', document={'_id':'history'})     
+                    requiredData.append(data[''][''][payload['which']])
+                elif payload['when'] == 'week':
+                    data = self.databaseClient.read_documents(collection_name='data_collected', document={'_id':'history'}) 
+                    for i in range(7):
+                        requiredData.append(data[''][''][payload['which']])
+                elif payload['when'] == 'month':
+                    data = self.databaseClient.read_documents(collection_name='data_collected', document={'_id':'history'}) 
+                    requiredData.append(data['summaries']['month'][payload['which']])
+                elif payload['when'] == 'year':
+                    data = self.databaseClient.read_documents(collection_name='data_collected', document={'_id':'history'}) 
+                    requiredData.append(data['summaries']['year'][payload['which']])
+
+                # TODO: fare in modo che i dati più vecchi di un certo periodo vengano compressi per risparmiare spazio (più tardi)
                 # TODO: xlabel glielo passo a posta o se lo ricava lui
-                self.append_data(code=timestamp, data=data)
-            elif i['command']=='changeSetpoints':
+                self.append_data(code=timestamp, data=requiredData)
+            elif i['command']=='changeSetpoints':   # ----> {Tin_max/Tin_min:int;Tewh_max/Tewh_min:int;time_dep:datetime object}
                 payload = i['payload']
-                # TODO: check payload format devo avere action and new_value
-                self.databaseClient.update_documents('home_configuration', {'_id':0}, payload)
+                data = self.databaseClient.read_documents(collection_name='home_configuration', document={'_id':0})
+                data[payload['appliance']]=payload['new_value']
+                self.databaseClient.update_documents('home_configuration', {'_id':0}, data)
+                payload['command'] = 0
+                payload['start_time'] = []
+                del payload['new_value']
 
                 self.shems.set_working_mode(payload)
                 cod = self.shems.solve()
@@ -208,19 +234,25 @@ class SHEMS_main():
                 elif cod == -1:
                     logging.info('Updating setpoint failed, no new scheduling')
                     self.append_data(code=timestamp, data={'response':'Updating setpoint failed, no new scheduling'})
+
+                # TODO: also change EV setpoints (in più)
+
             elif i['command']=='addAppliances':
                 payload = i['payload']
-                # TODO: check payload format, appliancesData
                 data = self.databaseClient.read_documents(collection_name='home_configuration', document={'_id':4})
+                
                 data['N_sched_appliances'] += 1
                 data['sched_appliances']['name'].append(payload['name'])
-                data['sched_appliances']['running_len_original'].append(payload['running_len_original'])
                 data['sched_appliances']['running_len'].append(payload['running_len'])
                 data['sched_appliances']['num_cycles'].append(payload['num_cycles'])
                 data['sched_appliances']['power_cons'].append(payload['power_cons'])
                 data['sched_appliances']['c1'].append(payload['c1'])
                 data['sched_appliances']['c2'].append(payload['c2'])
                 self.databaseClient.update_documents('home_configuration', {'_id':4}, data)
+                del payload['applianceData']
+                payload['command'] = 2
+                payload['appliance'] = []
+                payload['start_time'] = []
 
                 self.shems.set_working_mode(payload)
                 cod = self.shems.solve()
@@ -231,21 +263,24 @@ class SHEMS_main():
                     self.append_data(code=timestamp, data={'response':'Updating appliances list failed, no new scheduling'})
             elif i['command']=='deleteAppliances':
                 payload = i['payload']
-                # TODO: check payload format
                 data = self.client.read_documents(collection_name='home_configuration', document={'_id':4})
 
                 data['N_sched_appliances'] -= 1
                 for i in data['sched_appliances']['name']:
-                    if i == payload['name']:
+                    if i == payload['applianceData']['name']:
                         data['sched_appliances']['name'].pop(i)
-                        data['sched_appliances']['running_len_original'].pop(i)
                         data['sched_appliances']['running_len'].pop(i)
                         data['sched_appliances']['num_cycles'].pop(i)
                         data['sched_appliances']['power_cons'].pop(i)
                         data['sched_appliances']['c1'].pop(i)
                         data['sched_appliances']['c2'].pop(i)
-                        res = self.client.delete_documents(collection_name='home_configuration', document={'_id':4}) #TODO: cosa ne faccio di res
+                        res = self.client.delete_documents(collection_name='home_configuration', document={'_id':4})
                         self.databaseClient.write_document(document = data, collection_name='home_configuration')
+                        del payload['applianceData']
+                        payload['command'] = 2
+                        payload['appliance'] = []
+                        payload['start_time'] = []
+                        
                         self.shems.set_working_mode(payload)
                         cod = self.shems.solve()
                         if cod == 2:
@@ -261,9 +296,27 @@ class SHEMS_main():
                 data = self.client.read_documents(collection_name='community', document={}) #!!!!!!!
                 self.append_data(command='summary', data=data)
             elif i['command']=='registration':
-                # TODO:check payload format
                 payload = i['payload']
-                self.databaseClient.update_documents('home_configuration', {'_id':4}, payload) # !!!!!!
+                #temperatura minima e massima di boiler e ambiente,
+                data = self.databaseClient.read_documents(collection_name='home_configuration', document={'_id':0})
+                for i in range(payload['setpoints']['#']):
+                    data[payload['setpoints']['appliance'][i]]=payload['setpoints']['new_value'][i]
+                self.databaseClient.update_documents('home_configuration', {'_id':0}, data)
+                # ora di partenza della macchina, hreasolg minima di carica della macchina]
+                data = self.databaseClient.read_documents(collection_name='home_configuration', document={'_id':3})
+                data['batteries'][''] = payload['EV']['time']
+                data['batteries'][''] = payload['EV']['minimum']
+                self.databaseClient.update_documents('home_configuration', {'_id':3}, data)
+                # appliances:[modello, lavatrice-lavastovigle-vacuum cliner]
+                data = self.databaseClient.read_documents(collection_name='home_configuration', document={'_id':4})
+                data['N_sched_appliances'] += 1
+                data['sched_appliances']['name'].append(payload['name'])
+                data['sched_appliances']['running_len'].append(payload['running_len'])
+                data['sched_appliances']['num_cycles'].append(payload['num_cycles'])
+                data['sched_appliances']['power_cons'].append(payload['power_cons'])
+                data['sched_appliances']['c1'].append(payload['c1'])
+                data['sched_appliances']['c2'].append(payload['c2'])
+                self.databaseClient.update_documents('home_configuration', {'_id':4}, data)
 
     def append_data(self, code, data):
         """Append data to GUI_thread_data.json
@@ -273,19 +326,19 @@ class SHEMS_main():
             data (dict): data response
         """
         try:
-            fp = open('GUI_thread_data.json', 'r')
+            fp = open('./filesU/GUI_thread_data.json', 'r')
             file = json.load(fp)
             fp.close()
 
             file['responses'][code] = data
-            fp = open('GUI_thread_data.json', 'w')
+            fp = open('./files/GUI_thread_data.json', 'w')
             json.dump(file,fp)
             fp.close()
         except:
             logging.info('Error during the reading of the "main.py" command response') 
 
     def myserver_subscriber_callback(self, msg):
-        # TODO:contronllo del messaggio, piccola encriptazione del messaggio
+        # TODO:contronllo del messaggio, piccola encriptazione del messaggio (in più)
         try:
             self.myserver_publisher.myPublish(self.client_topic, msg.payload)
         except:
@@ -312,6 +365,8 @@ if __name__ == '__main__':
 
     GUIcommands = perpetualTimer(t=0.5, hFunction=main.GUI_thread_callback)
     GUIcommands.start()
+
+
 
     while True:
         pass

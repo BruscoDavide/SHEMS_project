@@ -1,0 +1,70 @@
+BASIC ENVIRONMENT SETUP
+- Python environment creation: 
+    folder creation: SHEMS_project as main root and then a single folder for each microservice
+    webserver_api folder
+        django-admin startproject SHEMS_webserver
+        python manage.py startapp mongoDB
+        settings.py: 
+            INSTALLED_APPS = [..., 'mongoapp'] 
+            DATABASES = {
+                'default': {
+                'ENGINE': 'djongo',
+                'NAME': 'SHEMS_test',
+                }
+            }
+        python manage.py makemigrations python manage.py migrate
+        certificate and key certificate generation, INSTALLED_APPS = [..., 'mongoapp', 'django_extensions']
+            python manage.py makemigrations python manage.py migrate
+            python manage.py runserver_plus --cert-file localhost.pem --key-file localhost-key.pem 
+_____________________________________
+MONGO DB
+How to work with mongoDB:
+
+I'm using 'MongoDB compass' as manager environment, I like it very much. Using it
+you need to connect to localhost, just pressing 'connect' without inserting any ip
+and creat a new database, only the first time, called 'SHEMS_database'.
+then try the code 'mongoDB_client_simulator.py'.
+
+_____________________________________
+FILES STRUCTURE:
+GUI_thread_commands.json
+{
+    "commands_list": [
+        {"command":"",
+         "timestamp":"",
+         "payload":{}
+        },
+        {},
+        ...
+    ]
+}
+
+GUI_thread_data.json
+{
+    "responses": {
+        timestamp:{
+            "command":"",
+            "payload":{}
+        },
+        {},
+        ...
+    }
+}
+
+starting_configuration,json
+{
+    "database_name": "SHEMS_database_local",
+    "database_ip": "localhost",
+    "mqtt_ip": 0,
+    "mqtt_port": 1883,
+    "mqtt_broker": "broker.hivemq.com",
+    "waterWithdrawn_topic":"waterWithdrawn_topic",
+    "carStation_topic": "carStation_topic",
+    "home_city":"Turin",
+    "country_code":380,
+    "API_KEY":"165605b60d026027b1e5d38b89469113",
+    "BASE_URL1":"http://api.openweathermap.org/geo/1.0/direct?",
+    "BASE_URL2": "https://api.openweathermap.org/data/2.5/forecast?",
+	"server_topic": "push_notification",
+	"client_topic": "client_test"
+}

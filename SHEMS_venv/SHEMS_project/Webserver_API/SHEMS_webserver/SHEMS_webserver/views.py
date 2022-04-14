@@ -20,7 +20,6 @@ from django.shortcuts import render
 commands_path = 'C:\\Users\\davide.brusco\\Documents\\Coding\\SHEMS\\SHEMS_project\\SHEMS_venv\\shems_project\\files\\GUI_thread_commands.json'
 data_path = 'C:\\Users\\davide.brusco\\Documents\\Coding\\SHEMS\\SHEMS_project\\SHEMS_venv\\shems_project\\files\\GUI_thread_data.json'
 
-
 def append_commands(command, flag_payload, payload=None):
     """Once a command is recevied from HTTP protocol, it is written in the GUI_thread_command.json file
     A new dictionary 'data' is appended to the list: 'command_list':[]
@@ -42,7 +41,7 @@ def append_commands(command, flag_payload, payload=None):
             file = json.load(fp)
             fp.close()
             
-            code = str(datetime.datetime.now()).split(' ')[1].split('.')[0]
+            code = str(datetime.datetime.now()).split('.')[0]
             data = {
                 "command": command,
                 "timestamp": code
@@ -105,18 +104,6 @@ def home(request):
     code = append_commands(command='home', flag_payload=False)
     data = read_data(command='home', code=code)
     return HttpResponse(data)
-
-def appliances(request):
-    """ Appliances currently switched on
-
-    Args:
-        request (HTTP request): GET request
-    Returns:
-        HttpResponse object
-    """
-    code = append_commands(command='appliances', flag_payload=False)
-    data = read_data(command='appliances', code=code)
-    return HttpResponse(data)
         
 def scheduling(request):
     """ Actual appliances scheduling
@@ -135,6 +122,11 @@ def changeScheduling(request):
         when = -1 it means now
     Args:
         request (HTTP request): POST request
+        POST body:
+        {
+            "which":"",
+            "when":""            
+        }
     Returns:
         HttpResponse object
     """
@@ -153,6 +145,7 @@ def summary(request):
 
     Args:
         request (HTTP request): GET request
+        SHEMS/summary?period=day&object=power
     Returns:
         HttpResponse object
     """
@@ -171,6 +164,12 @@ def settings(request):
 
     Args:
         request (HTTP request): POST request
+        {
+            action
+            appliance
+            new_value
+            applianceData
+        }
     Returns:
         HttpResponse object
     """
@@ -228,6 +227,10 @@ def registration(request):
 
     Args:
         request (HTTP request): POST request
+        {"setpoints":[{"object":"", "new_value":""},{....}],
+        "EV":{"time":"8:00","minum":"0.30"} # from 0.10 to 1
+        "applianceData":["","",""]
+        }
     Returns:
         HttpResponse object
     """

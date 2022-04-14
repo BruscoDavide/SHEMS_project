@@ -12,12 +12,16 @@ class EV_publisher():
         Args:
             cfg (dict): configuration file
         """
-        self.port = cfg['port']
-        self.broker = cfg['broker']
-        self.clientID = np.random.randint(1000000000)
-        self.publisher = MQTTPublisher(self.clientID, self.broker, self.port)
-        self.publisher.start()
-        self.EV_topic = cfg['carStation_topic']
+        try:
+            self.port = cfg['port']
+            self.broker = cfg['broker']
+            self.clientID = np.random.randint(1000000000)
+            self.publisher = MQTTPublisher(self.clientID, self.broker, self.port)
+            self.publisher.start()
+            self.EV_topic = cfg['carStation_topic']
+            self.status = 0
+        except:
+            logging.info('EV_publisher does not created')
 
     def EV_notify(self, status=None):
         """EV arriving or departure
@@ -25,7 +29,7 @@ class EV_publisher():
         Args:
             status (int): it can be 0 or 1: 1 means that the EV is at home, 0 means that the user is using the EV
         """
-        # TODO: cosa fare con status.. come simulo sta cosa?
+        self.status = (1-self.status)
         self.publisher.myPublish(self.EV_topic, status)
 
 class HW_publisher():
@@ -35,12 +39,15 @@ class HW_publisher():
         Args:
             cfg (dict): configuration file
         """
-        self.port = cfg['port']
-        self.broker = cfg['broker']
-        self.clientID = np.random.randint(1000000000)
-        self.publisher = MQTTPublisher(self.clientID, self.broker, self.port)
-        self.publisher.start()
-        self.EV_topic = cfg['waterWithdrawn_topic']
+        try:
+            self.port = cfg['port']
+            self.broker = cfg['broker']
+            self.clientID = np.random.randint(1000000000)
+            self.publisher = MQTTPublisher(self.clientID, self.broker, self.port)
+            self.publisher.start()
+            self.EV_topic = cfg['waterWithdrawn_topic']
+        except:
+            logging.info('HW_publisher does not created')
 
     def HW_notify(self):
         """HW used amount
@@ -48,37 +55,48 @@ class HW_publisher():
         Args:
             amount (int): amount of HW used 
         """
-        amount = np.random.randint() # TODO: ordine di grandezza dell'acqua consumata
+        amount = np.random.unfiorm(low=10, high=100) # TODO: ordine di grandezza dell'acqua consumata
         self.publisher.myPublish(self.EV_topic, amount)
 
 class smartMeter():
     def __init__(self, cfg):
-        self.port = cfg['port']
-        self.broker = cfg['broker']
-        self.clientID = np.random.randint(1000000000)
-        self.publisher = MQTTPublisher(self.clientID, self.broker, self.port)
-        self.publisher.start()
-        self.SM_topic = cfg['SF_topic']
+        """Smart meter simulator
+
+        Args:
+            cfg (dict): configuration file
+        """
+        try:
+            self.port = cfg['port']
+            self.broker = cfg['broker']
+            self.clientID = np.random.randint(1000000000)
+            self.publisher = MQTTPublisher(self.clientID, self.broker, self.port)
+            self.publisher.start()
+            self.SM_topic = cfg['SF_topic']
+        except:
+            logging.info('Smart meter does not created')
 
     def RTP_notify(self):
         RTP_list = [] # TODO: fare qualcosa di più interessante
         self.publisher.myPublish(self.SM_topic, RTP_list)
 
-class generalAppliances_subscriber():
-    """General appliance simulator
+class generalAppliances_subscriber(): 
+    def __init__(self, cfg):
+        """General appliance simulator
 
         Args:
             cfg (dict): configuration file
         """
-    def __init__(self, cfg):
-        self.port = cfg['port']
-        self.broker = cfg['broker']
-        self.clientID = np.random.randint(1000000000)
-        self.subscriber = MQTTSubscriber(self.clientID, self.broker, self.port)
-        self.subscriber.start()
-        self.subscriber.callbackRegistration(self.subscriber_callback)
-        self.generalAppliances_topic = str(self.clientID)+'_topic'
-        self.subscriber.mySubscribe(self.generalAppliances_topic)
+        try:
+            self.port = cfg['port']
+            self.broker = cfg['broker']
+            self.clientID = np.random.randint(1000000000)
+            self.subscriber = MQTTSubscriber(self.clientID, self.broker, self.port)
+            self.subscriber.start()
+            self.subscriber.callbackRegistration(self.subscriber_callback)
+            self.generalAppliances_topic = str(self.clientID)+'_topic'
+            self.subscriber.mySubscribe(self.generalAppliances_topic)
+        except:
+            logging.info(f'General appliance {self.clientID} does not created')
     
     def subscriber_callback(self, msg):
         pass

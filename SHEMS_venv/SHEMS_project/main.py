@@ -11,7 +11,7 @@ from utilities.timer import perpetualTimer
 from utilities.mqttclient import MQTTSubscriber, MQTTPublisher
 from mongoDB.database_client import databaseClient
 from optimizationModel.Simulator.instance import Instance
-from optimizationModel.LP_solver.SHEMSfile import SHEMS
+from optimizationModel.LP_solver.SHEMSModel import SHEMS
 
 class SHEMS_main():
     def __init__(self, cfg):
@@ -22,7 +22,7 @@ class SHEMS_main():
         """
         # Energy optimization model
         self.databaseClient = databaseClient()
-        new_instance = Instance() # TODO: da aggiungere a instance costruttore data = new_databaseClient.read_myDocuments() 
+        new_instance = Instance()
         self.shems = SHEMS(new_instance)
         
         # Sensors subscribers MQTT
@@ -75,7 +75,9 @@ class SHEMS_main():
         """    
         self.weatherAPI()
 
-        cod = self.shems.solve()
+        # self.instance = self.instance.getdataserv
+        # self.sehms.set_instace(instance.ge)
+        cod = self.shems.solve_definitive()
         if cod == 2:
             try:
                 self.home_publisher.myPublish(self.server_topic, 'First scheduling of the day having success')
@@ -97,6 +99,9 @@ class SHEMS_main():
                 temp.append(round(data[i]['main']['temp']-273, 1))
 
             new_temp = np.zeros(95)
+            # solar radiation su varaibles esempio: res_hour_gebn dalle 8 del mattino per 40 samples con un picco di massimo 10 , faccio una campana
+            # al massimo la facciamo figa dopo... 
+            # rendere questa parte in funzione del time_granularity 
             for i in range(7): # 0-6, data every 1 hour
                 new_temp[i*12]=temp[i]
                 new_temp[i*12+1] = round(temp[i]-(temp[i]-temp[i+1])/12, 1)
@@ -150,17 +155,25 @@ class SHEMS_main():
         """
         if msg.topic == self.waterWithdrawn_topic:
             new_data = msg.payload
-            # TODO: scrivo sul database o cosa??
-        elif msg.topic == self.carStation_topic: #!!!!!!!!!!! QUESTO NON SERVE, COSì HA DETTO VLAD
+            # TODO: ricevo un valori di flusso lo confronto con il vaore settato se minore amen se manggiore modifco e chiamo il modello
+            # il valore che ricevo lo genero tra e 0.03 , faccio un publisher, se il codice del modello è -1 richiedo troppa acqua dia ll'utente fottiti
+            data = self.databaseClient.read_documents(collection_name='home_configuration', document={'_id':})
+            data['Tout']=new_temp
+            self.databaseClient.update_documents(collection_name='home_configuration', document={'_id':1}, object=data)
+        elif msg.topic == self.carStation_topic:
             if msg.payload == 0 or msg.payload == 1:
-                new_data = msg.payload
-                # TODO: scrivo sul database o cosa??
+                #new_data = msg.payload
+                self.shems.set_car_arrival() #se arriva un 1
             else: 
                 logging.info('Error in the carStation publisher')
         elif msg.topic == self.smartMeter_topic:
+            # miserve un publoisher
             data = self.client.read_documents(collection_name='home_configuration', document={'_id':6})
             data['values']=msg.payload
             self.databaseClient.update_documents('home_configuration', {'_id':6}, data)
+            # rifare lo scheduling solita storia... qui dentro ora faccio il primo scheduling della giornata (lo eleimino da in giro)
+            # prima di iniziare la giornata mi salvo tutti i dati utili vecchi, da quellle variabili li (attributi di shems) 
+            # NONNNNNNNNNNNNNNNNNNNNNNOOOOOOOOOOOaggiorniamo il server con lo storico dei dati ad ogni scheduling
         else:
             logging.info(f'Error in the topic: {msg.topic}')
 
@@ -181,14 +194,25 @@ class SHEMS_main():
             # TODO:check timestamp (più tardi)
             
             if i['command']=='home': # on at this moment
+
+                # quando mi chiama home, io controllo quei vettori vedo cosa c'è attivo, guardo cosa c'è di attivo, temp casa, consumo acqua temp acqua ...
+                # non mi serve il database leggo dagli attributi di shems
+                # sono vettori di grandezza di 96, tranne ud è una matrice: 96*n_appliances
+                # 15*timegranularity/60 = quante ore dalle otto di mattina lo confronto con il time stamp attuale 
+                # brutto bastardo fammi vedere anche il livello delle batterie: self.shems.Cess / Cpev 0-Cess_max/Cpev_max
                 data = self.databaseClient.read_documents(collection_name='data_collected', document={'_id':'home'})
                 # TODO: write online appliances in the way shoed in the database
                 self.append_data(code=timestamp, data=data)    
             elif i['command']=='scheduling':
+                # vado sempre da quei vettori vado dalla matrice è leggo lo scheduling
+                # 15*timegranularity/60 = quante ore dalle otto di mattina lo confronto con il time stamp attuale
+                # in più storico della giornata delle attività fatte
+
                 data = self.databaseClient.read_documents(collection_name='data_collected', document={'_id':'actual_scheduling'})
                 self.append_data(code=timestamp, data=data)
             elif i['command']=='changeScheduling':
                 payload = i['payload'] 
+                #payload['start_time'] == now o data hh:mm 
                 payload['command']=1
 
                 self.shems.set_working_mode(payload)
@@ -214,6 +238,18 @@ class SHEMS_main():
                     for i in range(24):
                         s = 0                        
                         for j in range(4):
+                            # ste mi fa una variabile della giornata, attenzione ho anche i dati del futuro, per ho vettori da 96 recuper dallo tiestmap adesso capisco quale valore mi serve
+                            """
+                               act_time = act_datetime[1].split(':')
+        if act_time[0] == '00' or int(act_time[0]) < 8:
+            act_mins = 16*60 #hours passed from 8 to midnight
+            act_mins += int(act_time[0])
+            act_mins += int(act_time[1])
+        else:
+            act_mins = (int(act_time[0]) - 8)*60
+            act_mins += int(act_time[1])
+        start_point = math.ceil(act_mins/self.instance.time_granularity ) -1
+                            """
                             s += data[-(i+j+1)][data[-(i+j+1)].keys()[0]]['power'] #!!! non so se sarà power
                         values.append(s/4)
                         xlabel.append(data[-i+j+1].keys()[0])
@@ -286,6 +322,7 @@ class SHEMS_main():
                     data = self.databaseClient.read_documents(collection_name='home_configuration', document={'_id':0})
                     data[payload['appliance']]=payload['new_value']
                     self.databaseClient.update_documents(collection_name='home_configuration', document={'_id':0}, data=data)
+                # aggiungere da id_3: cess thresh_low/high
                 payload['command'] = 0
                 payload['start_time'] = []
                 del payload['new_value']
@@ -371,6 +408,7 @@ class SHEMS_main():
                         logging.info('Error appliances name wrong, not found')
 
             elif i['command']=='community':
+                # tranquillomodifico anche te m aspettiamo un attimo
                 payload = i['payload']
                 data = self.databaseClient.read_documents(collection_name='prosumer_community', document={'_id':payload['while']})
                 requiredData = []
@@ -454,10 +492,11 @@ class SHEMS_main():
                         data['home_setpoints'][i]=payload['setpoints'][i]
                     self.databaseClient.update_documents('home_configuration', {'_id':0}, data)
 
-                    # ora di partenza della macchina, threshold minima di carica della macchina
+                    # ora di partenza della macchina, threshold minima di carica della macchina e massima 
                     data = self.databaseClient.read_documents(collection_name='home_configuration', document={'_id':3})
-                    data['batteries']['.......'] = payload['EV']['time']
+                    data['batteries']['.......'] = payload['EV']['time'] # metti nomi giudto: questo id_ 7
                     data['batteries']['........'] = payload['EV']['minimum']
+                    data['batteries']['........'] = payload['EV']['maximum']
                     self.databaseClient.update_documents('home_configuration', {'_id':3}, data)
 
                     # appliances:[modello, lavatrice-lavastovigle-vacuum cliner]

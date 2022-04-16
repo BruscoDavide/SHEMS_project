@@ -13,27 +13,19 @@ class Instance():
         self.U_val = 0 #U value of the house, needed for the temperature dispersion
         self.Pac_max = 0 #AC max power
         self.Pewh_max = 0 #Water heater max power
-        self.AC_mode = 0 #1 Heating, -1 Chiller
         self.Tin_max = 0 #max indoor temp
         self.Tin_min = 0 #min indoor temp
         self.Tewh_max = 0 #max water temp
         self.Tewh_min = 0 #min water temp
         self.Tcw = [] #incoming cold water temperature. List because has different temp during the day
-        self.Ten = [] #same here, the enviromental temperature can be different during the day
         self.Tout = [] #outside temperatures
         self.Tset_off = 0 #tipical temperature of that kind of house
         self.Tset_off_wat = 0 #tipical temperature of the water in the pipes of that kind of house
 
         #extra EWH parameters:
-        self.U = 0 #stand-by loss
         self.SA = 0 #surface area
-        self.G = 0 # = self.U*self.SA
         self.Wd = [] #water withdrawn
-        self.rho = 0 #water density
         self.Cp = 0 #CHECK WHAT THIS PARAMETER IS
-        self.B = 0 #self.Wd*self.rho*self.C
-        self.Rprime = 0 #1/(self.G+self.B)
-        self.tau = 0 #self.Rprime*self.C
 
         #BATTERY ENERGY SOURCES
         self.disch_eff_ESS = 0 #ESS discharging efficiency
@@ -54,8 +46,6 @@ class Instance():
         self.Cpev_thresh_low = 0
         self.Cpev_thresh_high = 0
 
-        self.Cess_init = 0 #Save the battery status from one day to another
-        self.Cpev_init = 0 #Save the battery status at the arrival time
         #APPLIANCES
         self.N_sched_appliances = 0 #this number has to be defined so we can write variables like Nd and all the othersvariables
         #Probably in the instance phase will be created a list with the appliance names and their running length and their consumption
@@ -73,17 +63,12 @@ class Instance():
         
         #PRICES
         self.RTP = [] #list with the price of elec during all the day
-        self.RTP_avg = 0 #mean elec mean price. Check more what's useful for
         self.RTPess_dis = 0 #price for discharging the battery
         self.RTPpev_dis = 0 #prive for discharging the vehicle
-        self.RTPpev_ch = 0
 
         #TIME 
         self.time_granularity = 15 #expressed in minutes, tells the time range of the measures. In this way there are 96 time slots
         self.time_dep = 0 #departure time of PEV
-        self.time_arrival = 0 #arrival time of PEV (only for the first implementation, for next implementation not a constant
-                                                    #we'll use the MQTT subs)
-        self.tn_end = 0 #upper limit for the PEV battery utilization, after that, the vehicle will be only charged
 
     def get_data_serv(self):
         data = self.databaseClient.read_documents(collection_name='home_configuration', collection={'_id':0}) 

@@ -35,6 +35,9 @@ class SHEMS():
         self.Pess_ch  = np.zeros(int(1440/self.instance.time_granularity))
         self.Ppev_ch = np.zeros(int(1440/self.instance.time_granularity))
 
+        self.Phouse_consume = np.zeros(int(1440/self.instance.time_granularity))
+        self.Pselling = np.zeros(int(1440/self.instance.time_granularity))
+
         self.delta_t = 0
         self.start_point = 0
 
@@ -251,6 +254,7 @@ class SHEMS():
                 self.Pg_out[start_point+i] = model.getVarByName(f"Pg[{i}]").X
                 if self.first_iteration == 1:
                     for j in range(self.instance.N_sched_appliances):
+                        #this can be a source of bug, check if you can leave it like this or to put "start_point + i"
                         self.ud_out[i][j] = model.getVarByName(f"ud[{i},{j}]").X
                 elif self.appliances_set == 1 or self.modify_appliance["flag"] == 1:
                     pass
@@ -259,7 +263,12 @@ class SHEMS():
                         asd = index[1]
                         self.ud_out[start_point+i][index[0]] = model.getVarByName(f"ud[{i},{asd}]").X
                         #print(model.getVarByName(f"ud[{i},{asd}]").X)
-                        
+
+                #variables for telling the user how much is he consuming or has in surplus
+                for t in range(self.instance.N_sched_appliances):
+                    appliance_consumption_tmp = self.ud_out[start_point+i][t]*self.instance.sched_appliances["power_cons"][t]
+                self.Phouse_consume[start_point+i] = self.Pac_out[start_point+i] + self.Pewh_out[start_point+i] + appliance_consumption_tmp + self.instance.daily_mean_EA[start_point+i]
+                self.Pselling[start_point+i] = self.Phouse_consume[start_point+i] + self.instance.RES_hour_gen[start_point+i]
                     #print("\n")
             if self.first_iteration == 1:        
                 self.first_iteration = 0
@@ -449,7 +458,7 @@ class SHEMS():
             exp = np.exp(-self.instance.time_granularity*60*(1/(Rprime*C)))
 
             model.addConstr(
-                Q[i] == (0.947)*Pewh[i] #0.947 is the conversion of the kW to btu/s
+                Q[i] == (0.947)*6*Pewh[i] #0.947 is the conversion of the kW to btu/s
             )
 
             if exp != 0:

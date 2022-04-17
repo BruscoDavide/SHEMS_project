@@ -13,42 +13,41 @@ class SHEMS():
     def __init__(self, instance):
         self.instance = instance
 
-        self.total_power_cons = 0
-        self.Tin_out = np.zeros(int(1440/self.instance.time_granularity))
-        self.Pac_out = np.zeros(int(1440/self.instance.time_granularity))
-        self.Tewh_out = np.zeros(int(1440/self.instance.time_granularity))
-        self.Pewh_out = np.zeros(int(1440/self.instance.time_granularity))
-        self.ud_out = np.zeros((int(1440/self.instance.time_granularity), self.instance.N_sched_appliances))
-        self.Pg_out = np.zeros(int(1440/self.instance.time_granularity))
+        self.total_power_cons = 0 #sum of the total power consumed over the day, multiplied by the RTP(i)
+        self.Tin_out = np.zeros(int(1440/self.instance.time_granularity)) #internal scheduled temperature of the house
+        self.Pac_out = np.zeros(int(1440/self.instance.time_granularity)) #required temperature for keeping the internal temperature in the desider range
+        self.Tewh_out = np.zeros(int(1440/self.instance.time_granularity)) #schedule for the electic water heater given the water usage
+        self.Pewh_out = np.zeros(int(1440/self.instance.time_granularity)) #power used for keeping the EWH in the desired range
+        self.ud_out = np.zeros((int(1440/self.instance.time_granularity), self.instance.N_sched_appliances)) #activation indicators of the home appliacens
+        self.Pg_out = np.zeros(int(1440/self.instance.time_granularity)) #total power consumed/produced by the house: retrieved as the sum of EA + CA + SA + RES_power
 
-        self.Pess = np.zeros(int(1440/self.instance.time_granularity))
-        self.Cess = np.zeros(int(1440/self.instance.time_granularity))
-        self.Ppev = np.zeros(int(1440/self.instance.time_granularity))
-        self.Cpev = np.zeros(int(1440/self.instance.time_granularity))
-        self.Pg_market = np.zeros(int(1440/self.instance.time_granularity))
+        self.Pess = np.zeros(int(1440/self.instance.time_granularity)) #power that the ESS can return in output
+        self.Cess = np.zeros(int(1440/self.instance.time_granularity)) #capacity that the battery can supply
+        self.Ppev = np.zeros(int(1440/self.instance.time_granularity)) #power that the PEV can return in output
+        self.Cpev = np.zeros(int(1440/self.instance.time_granularity)) #capacity that the battery of the electic vehicle can supply
+        self.Pg_market = np.zeros(int(1440/self.instance.time_granularity)) #power exchange with the grid: positive is needed power, negative is selling power
 
-        self.Pess_chable = np.zeros(int(1440/self.instance.time_granularity))
-        self.Pess_disable = np.zeros(int(1440/self.instance.time_granularity))
-        self.Ppev_chable = np.zeros(int(1440/self.instance.time_granularity))
-        self.Ppev_disable = np.zeros(int(1440/self.instance.time_granularity))
+        self.Pess_chable = np.zeros(int(1440/self.instance.time_granularity)) #how much power can be insert in the battery
+        self.Pess_disable = np.zeros(int(1440/self.instance.time_granularity)) #how much power can be discharged from the battery
+        self.Ppev_chable = np.zeros(int(1440/self.instance.time_granularity)) #how much power can be insert in the electric vehicle
+        self.Ppev_disable = np.zeros(int(1440/self.instance.time_granularity)) #how much power can be discharged from the electric vehicle
 
-        self.Pess_ch  = np.zeros(int(1440/self.instance.time_granularity))
-        self.Ppev_ch = np.zeros(int(1440/self.instance.time_granularity))
+        self.Pess_ch  = np.zeros(int(1440/self.instance.time_granularity)) #quantity of power that was charged/discharged from the battery
+        self.Ppev_ch = np.zeros(int(1440/self.instance.time_granularity)) #quantity of power that was charged/discharged from the electric vehicle
 
-        self.Phouse_consume = np.zeros(int(1440/self.instance.time_granularity))
-        self.Pselling = np.zeros(int(1440/self.instance.time_granularity))
+        self.Phouse_consume = np.zeros(int(1440/self.instance.time_granularity)) #total power required from the house 
+        self.Pselling = np.zeros(int(1440/self.instance.time_granularity)) #net energy that can be sold 
 
-        self.delta_t = 0
-        self.start_point = 0
+        self.delta_t = 0 
+        self.start_point = 0 #used for calls different from the first morning iteration. It tells the slot of time we're in
 
         self.first_iteration = 1 #when the class is instantiated, it means that it's the first time it's runned, so it will do all the scheduling
-        self.appliances_set = 0
-        self.changed_set_points = 0
-        self.water_withdrawn = 0
-        self.new_or_deleted_appliance = {"flag":0, "backup":{}}
-        self.modify_appliance = {"flag":0, "appliance":[], "start_time":[]}
+        self.appliances_set = 0 #activated after the first schedule
+        self.changed_set_points = 0 #telling the system that there is needed a new scheduling because confort constraints changed
+        self.new_or_deleted_appliance = {"flag":0, "backup":{}} #used to insert or delete new appliances
+        self.modify_appliance = {"flag":0, "appliance":[], "start_time":[]} #used to change the time of execution of an appliance
 
-        self.vehicle_at_home = 0
+        self.vehicle_at_home = 0 #used for informing the system that the car is at home and it can be considered in the charging/discharging cycles
 
     def get_new_instance(self, instance):
         self.instance = instance

@@ -24,8 +24,8 @@ class SHEMS_main():
 
             # Energy optimization model
             self.databaseClient = databaseClient()
-            new_instance = Instance()
-            self.shems = SHEMS(new_instance)
+            self.instance = Instance()
+            self.shems = SHEMS(self.instance)
             
             # Sensors subscribers MQTT
             self.waterWithdrawn_topic = cfg['waterWithdrawn_topic']
@@ -57,8 +57,8 @@ class SHEMS_main():
                 logging.info(f'Error city coordinates recovering: {response.status_code}')
 
             # Push notification
-            self.server_topic = cfg['server_topic'] # LO USO PER ANDARE VERSO IL SERVER
-            self.client_topic = cfg['client_topic'] # LO USO PER ANDARE VERSO IL CLIENT FINALE, CIOè LA GUI
+            self.server_topic = cfg['server_topic'] # from home to the push server
+            self.client_topic = cfg['client_topic'] # from push server to the final user
             self.serverID_publisher = 'publisher_server'
             self.myserver_publisher = MQTTPublisher(self.serverID_publisher, self.broker, self.port)
             self.myserver_publisher.start()
@@ -79,13 +79,18 @@ class SHEMS_main():
         """    
         self.weatherAPI()
         
-        self.instance = self.instance.get_data_serv() #NON OLO RICONOSCE!!!!!!!!!!
+        self.instance = self.instance.get_data_serv()
         self.shems.get_new_instance(self.instance)
         
         cod = self.shems.solve_definitive()
         if cod == 2:
             try:
                 self.home_publisher.myPublish(self.server_topic, 'First scheduling of the day having success')
+                data = self.databaseClient.read_documents(collection_name='data_collected', document={'_id':'history'})
+                for j in range(60/self.time_granularity*24):
+                    data['Phouse_consume'].append(self.shems.Phouse_consume[j])
+                self.databaseClient.update_documents(collection_name='data_collected', document={'_id':'history'}, object=data)
+
             except:
                 logging.info('Error of the home during sending push notification message to the server')
         elif cod == -1:
@@ -178,19 +183,20 @@ class SHEMS_main():
                 data['Wd']=Wd
                 self.databaseClient.update_documents(collection_name='home_configuration', document={'_id':2}, object=Wd)
 
-            self.instance = self.instance.get_data_serv() #NON OLO RICONOSCE!!!!!!!!!!
+            self.instance = self.instance.get_data_serv()
             self.shems.get_new_instance(self.instance)
         
             cod = self.shems.solve_definitive()
             if cod == 2:
                 try:
                     self.home_publisher.myPublish(self.server_topic, 'New schedling, big amount of hot water used')
+
+                    self.historyData_saving(step)
+
                 except:
                     logging.info('Error of the home during sending push notification message to the server')
             elif cod == -1:
                 logging.info('New scheduling falied, too much hot water required')
-
-            # TODO: il valore che ricevo lo genero tra e 0.03 , faccio un publisher, 
 
         elif msg.topic == self.carStation_topic:
             if msg.payload == 1:
@@ -198,17 +204,13 @@ class SHEMS_main():
                 self.home_publisher.myPublish(self.server_topic, 'Electric vehicle in the garage')
             else: 
                 logging.info('Error in the carStation publisher')
-        elif msg.topic == self.smartMeter_topic:
 
-            # TODO: mi serve un publoisher
-            
+        elif msg.topic == self.smartMeter_topic:
             data = self.databaseClient.read_documents(collection_name='home_configuration', document={'_id':6})
             data['values']=msg.payload
             self.databaseClient.update_documents('home_configuration', {'_id':6}, data)
 
             self.basicScheduling_thread_callback()
-    
-            # TODO: salvo i dati degli attributi di shems, ad ogni nuovo scheduling devo aggiornare i dati salvati: posso avere un giorno con più schedule e quindi opiù dati
 
         else:
             logging.info(f'Error in the topic: {msg.topic}')
@@ -233,34 +235,73 @@ class SHEMS_main():
             step = 60/self.time_granularity*hh + math.floor(mm/self.time_granularity) 
 
             if i['command']=='home': # on at this moment
-                #step
-
-                # TODO: capire quali attributi mi servono e vedere nello step attuale quale applaincec è attivo e batteria
-                # sono vettori di grandezza di 96, tranne ud è una matrice: 96*n_appliances, il livello delle batterie: self.shems.Cess / Cpev 0-Cess_max/Cpev_max
+                data = {}
+                data['listDevices'] = []
+                for j in range(self.shems.instance.N_sched_appliances): # columns
+                    if self.shems.ud_out[step][j] == 1:
+                        info = self.databaseClient.read_documents(collection_name='home_configuration', document={'_id':4})
+                        ob = {}
+                        ob['name'] = info['sched_appliances']['name'][j]
+                        #ob[''] = info['sched_appliances'][''][j]
+                        data['listDevices'].append(ob)
+                data['ESS_battery'] = self.shems.Cess[step]
+                data['EV_battery'] = self.shems.Cpev[step]
+                data['Phouse'] = self.shems.Phouse_consume[step]
+                # sto comprando, sto vendendo ??
 
                 self.append_data(code=timestamp, data=data)
 
             elif i['command']=='scheduling':
-
-                # TODO: recuepero gli uno dalle variabili di shems
-                # in più storico della giornata delle attività fatte
+                data = {}
+                for j in range(self.shems.instance.N_sched_appliances): # columns
+                    info = self.databaseClient.read_documents(collection_name='home_configuration', document={'_id':4})
+                    name = info['sched_appliances']['name'][j]
+                    for i in range(60/self.time_granularity*24-1): # rows 
+                        if i != 0 and self.shems.ud_out[i][j] == 1 and self.shems.ud_out[i-1][j] == 0:
+                            start = i
+                            data[name]['start']  = start
+                        elif self.shems.ud_out[i][j] == 1 and self.shems.ud_out[i+1][j] == 0:
+                            end = i
+                            data[name]['end'] = end
+                            done = 0
+                            if end <= step:
+                                done = 1
+                            data[name]['done'] = done
+                
+                name = 'EWH'
+                for i in range(60/self.time_granularity*24-1): 
+                    if i != 0 and self.shems.Tewh_out[i][j] == 1 and self.shems.Tewh_out[i-1][j] == 0:
+                        start = i
+                        data[name]['start']  = start
+                    elif self.shems.Tewh_out[i][j] == 1 and self.shems.Tewh_out[i+1][j] == 0:
+                        end = i
+                        data[name]['end'] = end
+                        done = 0
+                        if end <= step:
+                            done = 1
+                        data[name]['done'] = done
 
                 self.append_data(code=timestamp, data=data)
+
             elif i['command']=='changeScheduling':
                 payload = i['payload'] 
                 payload['command']=1
                 # payload['start_time'] == now o data hh:mm da dire ad alwjo
-                
-                self.instance = self.instance.get_data_serv() #NON OLO RICONOSCE!!!!!!!!!!
+
+                self.instance = self.instance.get_data_serv()
                 self.shems.get_new_instance(self.instance)
 
                 self.shems.set_working_mode(payload)
                 cod = self.shems.solve()
                 if cod == 2:
                     self.append_data(code=timestamp, data={'response':'Changing schedluinig success, new scheduling'})
+                
+                    self.historyData_saving(step)
+
                 elif cod == -1:
                     logging.info('Changing scheduling failed, no new scheduling')
                     self.append_data(code=timestamp, data={'response':'Changing schedluinig failed, no new scheduling'})
+
             elif i['command']=='summary':
                 payload = i['payload']
                 data = self.databaseClient.read_documents(collection_name='data_collected', document={'_id':'history'})
@@ -275,8 +316,8 @@ class SHEMS_main():
                     m = 0
                     for i in range(24):
                         s = 0                        
-                        for j in range(self.time_granularity):
-                            s += self.shems.Phouse_consume[(step-j)*i]
+                        for j in range(60/self.time_granularity):
+                            s += data['Phouse_consume'][(step-j)*i]
                         values.append(s/(60/self.time_granularity))
                         xlabel.append((step-i)*self.time_granularity/60)
                         if s/(60/self.time_granularity) > max: max = s/(60/self.time_granularity)
@@ -297,8 +338,8 @@ class SHEMS_main():
                     m = 0
                     for i in range (7):
                         s = 0
-                        for j in range(24*self.time_granularity):
-                            s += self.shems.Phouse_consume[(step-j)*i]
+                        for j in range(24*60/self.time_granularity):
+                            s += data['Phouse_consume'][(step-j)*i]
                         values.append(s/(24*(60/self.time_granularity)))
                         xlabel.append((step-i*(self.time_granularity*24)))
                         if s/(24*(60/self.time_granularity)) > max: max = s/(24*(60/self.time_granularity))
@@ -319,8 +360,8 @@ class SHEMS_main():
                     m = 0
                     for i in range (7*4):
                         s = 0
-                        for j in range(24*(60/self.time_granularity)):
-                            s += self.shems.Phouse_consume[(step-j)*i]
+                        for j in range(24*60/self.time_granularity):
+                            s += data['Phouse_consume'][(step-j)*i]
                         if s/(24*(60/self.time_granularity)) > max: max = s/(24*(60/self.time_granularity))
                         if s/(24*(60/self.time_granularity)) < min: min = s/(24*(60/self.time_granularity))
                         m += s/(24*(60/self.time_granularity))
@@ -338,8 +379,8 @@ class SHEMS_main():
                     m = 0
                     for i in range (7*4*12):
                         s = 0
-                        for j in range(24*(60/self.time_granularity)):
-                            s += self.shems.Phouse_consume[(step-j)*i]
+                        for j in range(24*60/self.time_granularity):
+                            s += data['Phouse_consume'][(step-j)*i]
                         if s/(24*(60/self.time_granularity)) > max: max = s/(24*(60/self.time_granularity))
                         if s/(24*(60/self.time_granularity)) < min: min = s/(24*(60/self.time_granularity))
                         m += s/(24*(60/self.time_granularity))
@@ -369,13 +410,16 @@ class SHEMS_main():
                 payload['start_time'] = []
                 del payload['new_value']
                 
-                self.instance = self.instance.get_data_serv() #NON OLO RICONOSCE!!!!!!!!!!
+                self.instance = self.instance.get_data_serv()
                 self.shems.get_new_instance(self.instance)
 
                 self.shems.set_working_mode(payload)
                 cod = self.shems.solve_definitive()
                 if cod == 2:
                     self.append_data(code=timestamp, data={'response':'Updating setpoint success, new scheduling'})
+
+                    self.historyData_saving(step)
+
                 elif cod == -1:
                     logging.info('Updating setpoint failed, no new scheduling')
                     self.append_data(code=timestamp, data={'response':'Updating setpoint failed, no new scheduling'})
@@ -415,13 +459,16 @@ class SHEMS_main():
                 payload['appliance'] = []
                 payload['start_time'] = []
 
-                self.instance = self.instance.get_data_serv() #NON OLO RICONOSCE!!!!!!!!!!
+                self.instance = self.instance.get_data_serv()
                 self.shems.get_new_instance(self.instance)
 
                 self.shems.set_working_mode(payload)
                 cod = self.shems.solve_definitive()
                 if cod == 2:
                     self.append_data(code=timestamp, data={'response':'Updating appliances list success, new scheduling'})
+
+                    self.historyData_saving(step)
+
                 elif cod == -1:
                     logging.info('Updating appliances list failed, no new scheduling')
                     self.append_data(code=timestamp, data={'response':'Updating appliances list failed, no new scheduling'})
@@ -445,13 +492,16 @@ class SHEMS_main():
                         payload['appliance'] = []
                         payload['start_time'] = []
                         
-                        self.instance = self.instance.get_data_serv() #NON OLO RICONOSCE!!!!!!!!!!
+                        self.instance = self.instance.get_data_serv()
                         self.shems.get_new_instance(self.instance)
 
                         self.shems.set_working_mode(payload)
                         cod = self.shems.solve_definitive()
                         if cod == 2:
                             self.append_data(code=timestamp, data={'response':'Updating appliances list success, new scheduling'})
+
+                            self.historyData_saving(step)
+
                         elif cod == -1:
                             logging.info('Updating appliances list failed')
                             self.append_data(code=timestamp, data={'response':'Updating appliances list failed, no new scheduling'})
@@ -459,9 +509,8 @@ class SHEMS_main():
                         logging.info('Error appliances name wrong, not found')
 
             elif i['command']=='community':
-                # tranquillomodifico anche te m aspettiamo un attimo
                 payload = i['payload']
-                data = self.databaseClient.read_documents(collection_name='prosumer_community', document={'_id':payload['while']})
+                data = self.databaseClient.read_documents(collection_name='data_collected', document={'_id':'hisotry'})
                 requiredData = []
                 
                 if payload['when'] == 'day':
@@ -476,7 +525,8 @@ class SHEMS_main():
                     for i in range(24):
                         s = 0                        
                         for j in range(self.time_granularity):
-                            s += self.shems.Phouse_consume[(step-j)*i]
+                            s += data[payload['which']][(step-j)*i]
+
                         values.append(s/(60/self.time_granularity))
                         xlabel.append((step-i)*self.time_granularity/60)
                         if s/(60/self.time_granularity) > max: max = s/(60/self.time_granularity)
@@ -498,7 +548,8 @@ class SHEMS_main():
                     for i in range (7):
                         s = 0
                         for j in range(24*self.time_granularity):
-                            s += self.shems.Phouse_consume[(step-j)*i]
+                            s += data[payload['which']][(step-j)*i]
+
                         values.append(s/(24*(60/self.time_granularity)))
                         xlabel.append((step-i*(self.time_granularity*24)))
                         if s/(24*(60/self.time_granularity)) > max: max = s/(24*(60/self.time_granularity))
@@ -520,7 +571,8 @@ class SHEMS_main():
                     for i in range (7*4):
                         s = 0
                         for j in range(24*(60/self.time_granularity)):
-                            s += self.shems.Phouse_consume[(step-j)*i]
+                            s += data[payload['which']][(step-j)*i]
+
                         if s/(24*(60/self.time_granularity)) > max: max = s/(24*(60/self.time_granularity))
                         if s/(24*(60/self.time_granularity)) < min: min = s/(24*(60/self.time_granularity))
                         m += s/(24*(60/self.time_granularity))
@@ -539,7 +591,8 @@ class SHEMS_main():
                     for i in range (7*4*12):
                         s = 0
                         for j in range(24*(60/self.time_granularity)):
-                            s += self.shems.Phouse_consume[(step-j)*i]
+                            s += data[payload['which']][(step-j)*i]
+
                         if s/(24*(60/self.time_granularity)) > max: max = s/(24*(60/self.time_granularity))
                         if s/(24*(60/self.time_granularity)) < min: min = s/(24*(60/self.time_granularity))
                         m += s/(24*(60/self.time_granularity))
@@ -554,14 +607,14 @@ class SHEMS_main():
             elif i['command']=='registration':
                 try:
                     payload = i['payload']
-                    # temperatura minima e massima di boiler e ambiente,
+                    # Minimum and maximum temperature of the environment and of the WH
                     data = self.databaseClient.read_documents(collection_name='home_configuration', document={'_id':0})
                     keys = payload['setpoints'].keys()
                     for i in keys:
                         data['home_setpoints'][i]=payload['setpoints'][i]
                     self.databaseClient.update_documents('home_configuration', {'_id':0}, data)
 
-                    # ora di partenza della macchina, threshold minima di carica della macchina e massima 
+                    # Departure car time, minimum and maximum threashold charging level 
                     data = self.databaseClient.read_documents(collection_name='home_configuration', document={'_id':3})
                     data['batteries']['.......'] = payload['EV']['time'] # metti nomi giudto: questo id_ 7
                     data['batteries']['........'] = payload['EV']['minimum']
@@ -607,11 +660,46 @@ class SHEMS_main():
             logging.info('Error during the reading of the "main.py" command response') 
 
     def myserver_subscriber_callback(self, msg):
+        """_summary_
+
+        Args:
+            msg (_type_): _description_
+        """
         # TODO:contronllo del messaggio, piccola encriptazione del messaggio (in più)
         try:
             self.myserver_publisher.myPublish(self.client_topic, msg.payload)
         except:
             logging.info('Error of the push notification server')
+
+    def historyData_saving(self, step):
+        """_summary_
+
+        Args:
+            step (_type_): _description_
+        """
+        data = self.databaseClient.read_documents(collection_name='data_collected', document={'_id':'history'})
+        i = 60/self.time_granularity*24-step
+        for j in range(i):
+            data['Phouse_consume'][-i+j] = self.shems.Phouse_consume[step+j]
+        self.databaseClient.update_documents(collection_name='data_collected', document={'_id':'history'}, object=data)
+
+    def historyDataMarket_saving(self, step):
+        """_summary_
+
+        Args:
+            step (_type_): _description_
+        """
+        #TODO: capire quando server questo!!!!!
+        data = self.databaseClient.read_documents(collection_name='data_collected', document={'_id':'history'})
+        i = 60/self.time_granularity*24-step
+        for j in range(i):
+            if self.shems.Pg_market[step+j] > 0:
+                data['energyBought'][-i+j] = self.shems.Pg_market[step+j]
+                data['energySold'][-i+j] = 0
+            else:
+                data['energyBought'][-i+j] = 0
+                data['energySold'][-i+j] = self.shems.Pg_market[step+j]
+        self.databaseClient.update_documents(collection_name='data_collected', document={'_id':'history'}, object=data)
 
 if __name__ == '__main__':
     

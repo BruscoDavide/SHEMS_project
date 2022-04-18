@@ -1,6 +1,7 @@
-import numpy as np
 import json
 import logging
+import numpy as np
+from numpy.random import uniform
 
 from utilities.mqttclient import MQTTPublisher, MQTTSubscriber
 from utilities.timer import perpetualTimer
@@ -55,7 +56,7 @@ class HW_publisher():
         Args:
             amount (int): amount of HW used 
         """
-        amount = np.random.unfiorm(low=10, high=100) # TODO: ordine di grandezza dell'acqua consumata
+        amount = np.random.unfiorm(low=0.01, high=0.03)
         self.publisher.myPublish(self.EV_topic, amount)
 
 class smartMeter():
@@ -72,11 +73,38 @@ class smartMeter():
             self.publisher = MQTTPublisher(self.clientID, self.broker, self.port)
             self.publisher.start()
             self.SM_topic = cfg['SF_topic']
+            self.time_granularity = cfg['time_granularity']
         except:
             logging.info('Smart meter does not created')
 
     def RTP_notify(self):
-        RTP_list = [] # TODO: fare qualcosa di più interessante
+        """
+        Peak: 10-13-17-19
+        Medium: rest of the day
+        Low: night
+        """
+        RTP_list = [] 
+        for i in range(60/self.time_granularity*24):
+            if abs(i*self.time_granularity/60 - 10) < 2:
+                l = 0.17
+                h = 0.25
+            elif abs(i*self.time_granularity/60 - 13) < 2:
+                l = 0.17
+                h = 0.25
+            elif abs(i*self.time_granularity/60 - 17) < 2:
+                l = 0.17
+                h = 0.25
+            elif abs(i*self.time_granularity/60 - 19) < 2:
+                l = 0.17
+                h = 0.25
+            elif i*self.time_granularity/60 < 7 and i*self.time_granularity/60 > 22:
+                l = 0.01
+                h = 0.10
+            else:
+                l = 0.10
+                h = 0.17
+            RTP_list.append(uniform(low=l, high=h))
+        
         self.publisher.myPublish(self.SM_topic, RTP_list)
 
 class generalAppliances_subscriber(): 

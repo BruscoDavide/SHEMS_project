@@ -1,4 +1,4 @@
-from MyMQTT import MyMQTT
+from utilities.mqttclient import MQTTPublisher, MQTTSubscriber
 import pandas as pd
 import json
 import time
@@ -19,40 +19,25 @@ class Prosumer:
         self.waiting_selling_confirm = False
         self.number_sendings = 0
 
-        self.prosumerSubscriber = MyMQTT(name, 'broker.hivemq.com', 1883,  self)
-        self.prosumerPublisher = MyMQTT(name + "_pub", 'broker.hivemq.com', 1883)
+        self.prosumerSubscriber = MQTTSubscriber(name, 'broker.hivemq.com', 1883)
+        self.prosumerSubscriber.start()
+        self.prosumerSubscriber.mySubscribe('offers')
+        self.prosumerSubscriber.mySubscribe('ste')
+        self.prosumerPublisher = MQTTPublisher(name + "_pub", 'broker.hivemq.com', 1883)
+        self.prosumerPublisher.start()
         
         self.communication_started = 0
-#%% MQTT: START/STOP/SUBSCRIBE
-    #TODO: vedere se si possono far partire tutti insieme
-    ##################################
-    def publisher_start(self):
-        self.prosumerPublisher.start()
-
-    def subscriber_start(self):
-        self.prosumerSubscriber.start()
-    ###################################
-
-    #TODO: vedere se si possono stoppare tutti insieme
-    ###################################
-    def publisher_stop(self):
-        self.prosumerPublisher.stop()
-
-    def subscriber_stop(self):
-        self.prosumerSubscriber.stop()
-    ###################################
 
     def subscribe(self, topic):
         self.prosumerSubscriber.mySubscribe(topic)
 #%% NOTIFY AND MESSAGE ANALYSIS
-    def notify(self, topic, msg): #callback for when a message is received
-        #Receive all the offers from the prosumers and save in the local record
-        # - if the prosumer is new, insert it
-        # - if already in, update it's offer
-        #print("inside notify")
+    def notify(self, topic, msg): 
+        """
+        Receive all the offers from the prosumers and save in the local record
+         - if the prosumer is new, insert it
+         - if already in, update it's offer
+        """
         try:
-            print("1) inside notify")
-            print("2", topic)
             msg = json.loads(msg)
             msg = json.loads(msg)
 ########################################################################################
@@ -211,10 +196,6 @@ class Prosumer:
 
 if __name__ == "__main__":
     prosumer = Prosumer("ste")
-    prosumer.publisher_start()
-    prosumer.subscriber_start()
-    prosumer.subscribe("offers")
-    prosumer.subscribe("ste")
     
     try:
         while True:

@@ -79,12 +79,15 @@ class SHEMS_main():
         """    
         self.weatherAPI()
         
-        self.instance = self.instance.get_data_serv() #NON OLO RICONOSCE!!!!!!!!!!
+        self.instance = self.instance.get_data_serv() #NON OLO RICONOSCE!!!!!!!!!! #TODO: perche sovrascrivi instance, per questo non lo riconosce
+        #dovrebbe essere:
+        #self.instance.get_data_serv()
         self.shems.get_new_instance(self.instance)
         
         cod = self.shems.solve_definitive()
         if cod == 2:
             try:
+                #TODO: qua dobbiamo salvare i dati sul server dello scheduling
                 self.home_publisher.myPublish(self.server_topic, 'First scheduling of the day having success')
             except:
                 logging.info('Error of the home during sending push notification message to the server')

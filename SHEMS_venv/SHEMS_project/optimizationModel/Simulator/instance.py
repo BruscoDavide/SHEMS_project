@@ -71,10 +71,10 @@ class Instance():
         self.time_dep = 0 #departure time of PEV
 
     def get_data_serv(self):
-        data = self.databaseClient.read_documents(collection_name='home_configuration', collection={'_id':0}) 
-        
+        data = self.databaseClient.read_documents(collection_name='home_configuration', document={'_id':0}) 
+        data = data['home_setpoints']
         #THERMAL CONFORT 
-        self.U_val = data["U_val"] #U value of the house, needed for the temperature dispersion
+        
         self.Pac_max = data["Pac_max"] #AC max power
         self.Pewh_max = data["Pewh_max"] #Water heater max power
         self.AC_mode = data["AC_mode"] #1 Heating, -1 Chiller
@@ -82,34 +82,28 @@ class Instance():
         self.Tin_min = data["Tin_min"] #min indoor temp
         self.Tewh_max = data["Tewh_max"] #max water temp
         self.Tewh_min = data["Tewh_min"] #min water temp
-        self.Tcw = data["Tcw"] #incoming cold water temperature. List because has different temp during the day
-        self.Ten = data["Ten"] #same here, the enviromental temperature can be different during the day
-        self.Tout = data["Tout"] #outside temperatures
         self.Tset_off = data["Tset_off"] #tipical temperature of that kind of house
         self.Tset_off_wat = data["Tset_off_wat"] #tipical temperature of the water in the pipes of that kind of house
 
-        data = self.databaseClient.read_documents(collection_name='home_configuration', collection={'_id':2}) 
-        
+        data = self.databaseClient.read_documents(collection_name='home_configuration', document={'_id':1}) 
+        data = data['outside_measure']
+        self.Tcw = data["Tcw"] #incoming cold water temperature. List because has different temp during the day
+        self.Ten = data["Ten"] #same here, the enviromental temperature can be different during the day
+        self.Tout = data["Tout"] #outside temperatures
+        self.Wd = data["Wd"]  #water withdrawn
+
+        data = self.databaseClient.read_documents(collection_name='home_configuration', document={'_id':2}) 
+        data = data['hw']
         #extra EWH parameters:
         self.R = data['R']
         self.boiler_vol =  data["boiler_vol"]
         self.boiler_radius = data["boiler_radius"]
         self.Cp = data["Cp"]
         
-        self.U = data["U"] #stand-by loss
-        self.home_dimensions = data["home_dimensions"]
-        self.SA = data["SA"] #surface area
-        self.G = data["G"] # = self.U*self.SA
-        self.Wd = data["Wd"]  #water withdrawn
-        self.rho = data["rho"] #water density
-        self.C = data["C"] #CHECK WHAT THIS PARAMETER IS
-        self.B = data["B"] #self.Wd*self.rho*self.C
-        self.Rprime = data["Rprime"] #1/(self.G+self.B)
-        self.tau = data["tau"] #self.Rprime*self.C
-
-        data = self.databaseClient.read_documents(collection_name='home_configuration', collection={'_id':3}) 
-
+        
         #BATTERY ENERGY SOURCES
+        data = self.databaseClient.read_documents(collection_name='home_configuration', document={'_id':3}) 
+        data = data["batteries"]
         self.disch_eff_ESS = data["disch_eff_ESS"] #ESS discharging efficiency
         self.disch_eff_PEV = data["disch_eff_PEV"] #PEV discharging efficiency
         self.charge_eff_ESS = data["charge_eff_ESS"] #ESS charging efficiency
@@ -131,34 +125,37 @@ class Instance():
         self.Cess_init = data["Cess_init"] #Save the battery status from one day to another
         self.Cpev_init = data["Cpev_init"] #Save the battery status at the arrival time
 
-        data = self.databaseClient.read_documents(collection_name='home_configuration', collection={'_id':4}) 
-
         #APPLIANCES
+        data = self.databaseClient.read_documents(collection_name='home_configuration', document={'_id':4}) 
+        data = data["appliances"]
         self.N_sched_appliances = data["N_sched_appliances"] #this number has to be defined so we can write variables like Nd and all the othersvariables
         #Probably in the instance phase will be created a list with the appliance names and their running length and their consumption
         self.sched_appliances = data["sched_appliances"] 
-        self.daily_mean_EA = data["daily_mean_EA"]
-
-        data = self.databaseClient.read_documents(collection_name='home_configuration', collection={'_id':5}) 
 
         #OTHER ENERGY SOURCES
+        data = self.databaseClient.read_documents(collection_name='home_configuration', document={'_id':5}) 
+        data = data["energy"]
+        self.daily_mean_EA = data["daily_mean_EA"]
         self.RES_hour_gen = data["RES_hour_gen"] #REV hourly production, probably like kW/h
         self.Pdr = data["Pdr"] #contract with the utility
         
-        data = self.databaseClient.read_documents(collection_name='home_configuration', collection={'_id':6}) 
-
         #PRICES
-        self.RTP = data["RTP"] #list with the price of elec during all the day
+        data = self.databaseClient.read_documents(collection_name='home_configuration', document={'_id':6}) 
+        data = data["RTP"]
+        self.RTP = data["values"] #list with the price of elec during all the day
         self.RTP_avg = data["RTP_avg"] #mean elec mean price. Check more what's useful for
         self.RTPess_dis = data["RTPess_dis"]  #price for discharging the battery
         self.RTPpev_dis = data["RTPpev_dis"] #prive for discharging the vehicle
         self.RTPpev_ch = data["RTPpev_ch"]
 
-        data = self.databaseClient.read_documents(collection_name='home_configuration', collection={'_id':7}) 
-
         #TIME 
+        data = self.databaseClient.read_documents(collection_name='home_configuration', document={'_id':7}) 
+        data = data["time"]
         self.time_granularity = data["time_granularity"] #expressed in minutes, tells the time range of the measures. In this way there are 96 time slots
         self.time_dep = data["time_dep"] #departure time of PEV
-        self.time_arrival = data["time_arrival"] #arrival time of PEV (only for the first implementation, for next implementation not a constant
-                                                    #we'll use the MQTT subs)
-        self.tn_end = data["tn_end"] #upper limit for the PEV battery utilization, after that, the vehicle will be only charged
+
+        #HOUSE CONSTRUCTION
+        data = self.databaseClient.read_documents(collection_name='home_configuration', document={'_id':8}) 
+        data = data['home_construction']
+        self.home_dimensions = data["home_dimensions"]
+        self.U_val = data["U_val"] #U value of the house, needed for the temperature dispersion

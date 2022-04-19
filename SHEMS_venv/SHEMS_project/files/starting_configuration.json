@@ -12,5 +12,7 @@
     "API_KEY":"165605b60d026027b1e5d38b89469113",
     "BASE_URL1":"http://api.openweathermap.org/geo/1.0/direct?",
     "BASE_URL2": "https://api.openweathermap.org/data/2.5/forecast?",
-	"server_topic": "push_notification"
+	"server_topic": "push_notification1",
+    "client_topic": "push_notification2",
+    "time_granularity":15
 }

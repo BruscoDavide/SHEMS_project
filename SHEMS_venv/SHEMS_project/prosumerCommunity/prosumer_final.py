@@ -1,4 +1,4 @@
-from MyMQTT import MyMQTT
+from .MyMQTT import MyMQTT
 import pandas as pd
 import json
 import time

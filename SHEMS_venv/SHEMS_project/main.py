@@ -26,13 +26,14 @@ class SHEMS_main():
             # Energy optimization model
             self.databaseClient = databaseClient()
             self.instance = Instance()
+            self.instance.get_data_serv()
             self.shems = SHEMS(self.instance)
             
             # Sensors subscribers MQTT
             self.waterWithdrawn_topic = cfg['waterWithdrawn_topic']
             self.carStation_topic = cfg['carStation_topic']
-            self.smartMeter_topic = cfg['smartmeter_topic']
-            self.deviceID = randint(1000000000)
+            self.smartMeter_topic = cfg['smartMeter_topic']
+            self.deviceID = str(randint(1000000000))
             self.broker = cfg['mqtt_broker']
             self.port = cfg['mqtt_port']
             self.sensors_subscriber = MQTTSubscriber(self.deviceID, self.broker, self.port)
@@ -44,7 +45,7 @@ class SHEMS_main():
 
             # Weather forecast API
             self.city = cfg['home_city']
-            self.country_code=cfg['country_code']
+            self.country_code = cfg['country_code']
             self.BASE_URL1 = cfg['BASE_URL1']
             self.BASE_URL2 = cfg['BASE_URL2']
             self.API_KEY = cfg['API_KEY']
@@ -52,8 +53,8 @@ class SHEMS_main():
             url = f"http://api.openweathermap.org/geo/1.0/direct?q={self.city},{self.country_code}&limit={limit}&appid={self.API_KEY}"
             response = requests.get(url)
             if response.status_code == 200:
-                self.lat = int(response.json()['lat'])
-                self.lon = int(response.json()['lon'])
+                self.lat = int(response.json()[0]['lat'])
+                self.lon = int(response.json()[0]['lon'])
             else:
                 logging.info(f'Error city coordinates recovering: {response.status_code}')
 
@@ -86,7 +87,6 @@ class SHEMS_main():
         cod = self.shems.solve_definitive()
         if cod == 2:
             try:
-                #TODO: qua dobbiamo salvare i dati sul server dello scheduling
                 self.home_publisher.myPublish(self.server_topic, 'First scheduling of the day having success')
                 data = self.databaseClient.read_documents(collection_name='data_collected', document={'_id':'history'})
                 for j in range(60/self.time_granularity*24):
@@ -714,12 +714,15 @@ if __name__ == '__main__':
 
     main = SHEMS_main(cfg)
 
+
+    main.basicScheduling_thread_callback()
+    """
     GUIcommands = perpetualTimer(t=0.5, hFunction=main.GUI_thread_callback)
     GUIcommands.start()
 
     prosumer = Prosumer("shems")
     prosumer_timer = perpetualTimer(t = 15*60, hFunction = prosumer.thread_callback)
     prosumer_timer.start()
-
+    """
     while True:
         pass

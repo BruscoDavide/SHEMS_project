@@ -11,6 +11,7 @@ from utilities.mqttclient import MQTTSubscriber, MQTTPublisher
 from mongoDB.database_client import databaseClient
 from optimizationModel.Simulator.instance import Instance
 from optimizationModel.LP_solver.SHEMSModel import SHEMS
+from prosumerCommunity.prosumer_final import Prosumer
 
 class SHEMS_main():
     def __init__(self, cfg):
@@ -79,9 +80,7 @@ class SHEMS_main():
         """    
         self.weatherAPI()
         
-        self.instance = self.instance.get_data_serv() #NON OLO RICONOSCE!!!!!!!!!! #TODO: perche sovrascrivi instance, per questo non lo riconosce
-        #dovrebbe essere:
-        #self.instance.get_data_serv()
+        self.instance.get_data_serv()
         self.shems.get_new_instance(self.instance)
         
         cod = self.shems.solve_definitive()
@@ -186,7 +185,7 @@ class SHEMS_main():
                 data['Wd']=Wd
                 self.databaseClient.update_documents(collection_name='home_configuration', document={'_id':2}, object=Wd)
 
-            self.instance = self.instance.get_data_serv()
+            self.instance.get_data_serv()
             self.shems.get_new_instance(self.instance)
         
             cod = self.shems.solve_definitive()
@@ -236,6 +235,7 @@ class SHEMS_main():
             hh = time.split(' ')[1].split(':')[0]
             mm = time.split(' ')[1].split(':')[1]
             step = 60/self.time_granularity*hh + math.floor(mm/self.time_granularity) 
+            #TODO: attenzione che il vettorei parte dalle 8 del mattino fino alle 8 del giorno dopo
 
             if i['command']=='home': # on at this moment
                 data = {}
@@ -250,7 +250,6 @@ class SHEMS_main():
                 data['ESS_battery'] = self.shems.Cess[step]
                 data['EV_battery'] = self.shems.Cpev[step]
                 data['Phouse'] = self.shems.Phouse_consume[step]
-                # sto comprando, sto vendendo ??
 
                 self.append_data(code=timestamp, data=data)
 
@@ -287,11 +286,12 @@ class SHEMS_main():
                 self.append_data(code=timestamp, data=data)
 
             elif i['command']=='changeScheduling':
+                # ad alejo: controlo che si faccia un cambio scheduling di un device che deve ancora essere eseguito e deve concludersi primde delle otto del mattino
                 payload = i['payload'] 
                 payload['command']=1
                 # payload['start_time'] == now o data hh:mm da dire ad alwjo
 
-                self.instance = self.instance.get_data_serv()
+                self.instance.get_data_serv()
                 self.shems.get_new_instance(self.instance)
 
                 self.shems.set_working_mode(payload)
@@ -413,7 +413,7 @@ class SHEMS_main():
                 payload['start_time'] = []
                 del payload['new_value']
                 
-                self.instance = self.instance.get_data_serv()
+                self.instance.get_data_serv()
                 self.shems.get_new_instance(self.instance)
 
                 self.shems.set_working_mode(payload)
@@ -462,7 +462,7 @@ class SHEMS_main():
                 payload['appliance'] = []
                 payload['start_time'] = []
 
-                self.instance = self.instance.get_data_serv()
+                self.instance.get_data_serv()
                 self.shems.get_new_instance(self.instance)
 
                 self.shems.set_working_mode(payload)
@@ -495,7 +495,7 @@ class SHEMS_main():
                         payload['appliance'] = []
                         payload['start_time'] = []
                         
-                        self.instance = self.instance.get_data_serv()
+                        self.instance.get_data_serv()
                         self.shems.get_new_instance(self.instance)
 
                         self.shems.set_working_mode(payload)
@@ -519,7 +519,6 @@ class SHEMS_main():
                 if payload['when'] == 'day':
                     # devo andare indietro di 24*4 valori
 
-                    #TODO: sostituire Phouse_consume con altro
                     values = []
                     xlabel = []
                     min = 999999
@@ -685,14 +684,8 @@ class SHEMS_main():
         for j in range(i):
             data['Phouse_consume'][-i+j] = self.shems.Phouse_consume[step+j]
         self.databaseClient.update_documents(collection_name='data_collected', document={'_id':'history'}, object=data)
-
-    def historyDataMarket_saving(self, step):
-        """_summary_
-
-        Args:
-            step (_type_): _description_
-        """
-        #TODO: capire quando server questo!!!!!
+        
+        # historyDataMarket_saving
         data = self.databaseClient.read_documents(collection_name='data_collected', document={'_id':'history'})
         i = 60/self.time_granularity*24-step
         for j in range(i):
@@ -702,6 +695,7 @@ class SHEMS_main():
             else:
                 data['energyBought'][-i+j] = 0
                 data['energySold'][-i+j] = self.shems.Pg_market[step+j]
+            data['Pg_market'][-i+j] = self.shems.Pg_market[step+j]   
         self.databaseClient.update_documents(collection_name='data_collected', document={'_id':'history'}, object=data)
 
 if __name__ == '__main__':
@@ -722,6 +716,10 @@ if __name__ == '__main__':
 
     GUIcommands = perpetualTimer(t=0.5, hFunction=main.GUI_thread_callback)
     GUIcommands.start()
+
+    prosumer = Prosumer("shems")
+    prosumer_timer = perpetualTimer(t = 15*60, hFunction = prosumer.thread_callback)
+    prosumer_timer.start()
 
     while True:
         pass

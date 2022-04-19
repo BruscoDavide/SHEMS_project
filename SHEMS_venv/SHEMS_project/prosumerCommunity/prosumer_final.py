@@ -25,6 +25,8 @@ class Prosumer:
         self.prosumerPublisher = MyMQTT(name + "_pub", 'broker.hivemq.com', 1883)
         
         self.time_instant_counter = 0
+
+        self.databaseClient = databaseClient()
 #%% MQTT: START/STOP/SUBSCRIBE
     def publisher_start(self):
         self.prosumerPublisher.start()
@@ -180,18 +182,9 @@ class Prosumer:
             print("error in response analysis")
 
     def thread_callback(self):
-        data = self.databaseClient.read_documents(collection_name='home_configuration', collection={'_id':0}) #TODO: insert correct query, need Pg e RTP
-        rtp_i = data["RTP"][self.time_instant_counter]/2
-        self.set_instant_params(rtp_i, data["Pg"][self.time_instant_counter])
+        data = self.databaseClient.read_documents(collection_name='data_collected', collection={'_id':'history'}) #TODO: insert correct query, need Pg e RTP
+        Pg_i = data['Pg_market']
+        data = self.databaseClient.read_documents(collection_name='home_configuration', collection={'_id':6})
+        rtp_i = data["RTP"]['values'][self.time_instant_counter]/2
+        self.set_instant_params(rtp_i, Pg_i[self.time_instant_counter])
         self.time_instant_counter += 1
-
-
-
-
-if __name__ == "__main__":
-    prosumer = Prosumer("shems")
-    prosumer_timer = perpetualTimer(t = 15, hFunction = prosumer.thread_callback)
-    prosumer_timer.start()
-
-    while True:
-        pass

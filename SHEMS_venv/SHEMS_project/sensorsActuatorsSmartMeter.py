@@ -1,3 +1,4 @@
+import time
 import json
 import logging
 import numpy as np
@@ -14,24 +15,28 @@ class EV_publisher():
             cfg (dict): configuration file
         """
         try:
-            self.port = cfg['port']
-            self.broker = cfg['broker']
-            self.clientID = np.random.randint(1000000000)
+            self.port = cfg['mqtt_port']
+            self.broker = cfg['mqtt_broker']
+            self.clientID = str(np.random.randint(1000000000))
             self.publisher = MQTTPublisher(self.clientID, self.broker, self.port)
-            self.publisher.start()
+            self.publisher.start() 
             self.EV_topic = cfg['carStation_topic']
-            self.status = 0
+            self.status = None
         except:
             logging.info('EV_publisher does not created')
 
-    def EV_notify(self, status=None):
+    def EV_notify(self):
         """EV arriving or departure
 
         Args:
             status (int): it can be 0 or 1: 1 means that the EV is at home, 0 means that the user is using the EV
         """
-        self.status = (1-self.status)
-        self.publisher.myPublish(self.EV_topic, status)
+        self.status = 1 # rendere più randomico o non lo so...
+        try:
+            self.publisher.myPublish(self.EV_topic, self.status)
+        except:
+            pass
+            # chiedere a ste che messaggi vogliamo fare
 
 class HW_publisher():
     def __init__(self, cfg):
@@ -41,9 +46,9 @@ class HW_publisher():
             cfg (dict): configuration file
         """
         try:
-            self.port = cfg['port']
-            self.broker = cfg['broker']
-            self.clientID = np.random.randint(1000000000)
+            self.port = cfg['mqtt_port']
+            self.broker = cfg['mqtt_broker']
+            self.clientID = str(np.random.randint(1000000000))
             self.publisher = MQTTPublisher(self.clientID, self.broker, self.port)
             self.publisher.start()
             self.EV_topic = cfg['waterWithdrawn_topic']
@@ -56,7 +61,7 @@ class HW_publisher():
         Args:
             amount (int): amount of HW used 
         """
-        amount = np.random.unfiorm(low=0.01, high=0.03)
+        amount = np.random.uniform(low=0.01, high=0.03)
         self.publisher.myPublish(self.EV_topic, amount)
 
 class smartMeter():
@@ -67,12 +72,12 @@ class smartMeter():
             cfg (dict): configuration file
         """
         try:
-            self.port = cfg['port']
-            self.broker = cfg['broker']
-            self.clientID = np.random.randint(1000000000)
+            self.port = cfg['mqtt_port']
+            self.broker = cfg['mqtt_broker']
+            self.clientID = str(np.random.randint(1000000000))
             self.publisher = MQTTPublisher(self.clientID, self.broker, self.port)
             self.publisher.start()
-            self.SM_topic = cfg['SF_topic']
+            self.SM_topic = cfg['smartMeter_topic']
             self.time_granularity = cfg['time_granularity']
         except:
             logging.info('Smart meter does not created')
@@ -84,7 +89,7 @@ class smartMeter():
         Low: night
         """
         RTP_list = [] 
-        for i in range(60/self.time_granularity*24):
+        for i in range(int(60/self.time_granularity*24)):
             if abs(i*self.time_granularity/60 - 10) < 2:
                 l = 0.17
                 h = 0.25
@@ -105,7 +110,7 @@ class smartMeter():
                 h = 0.17
             RTP_list.append(uniform(low=l, high=h))
         
-        self.publisher.myPublish(self.SM_topic, RTP_list)
+        self.publisher.myPublish(self.SM_topic, len(RTP_list))
 
 class generalAppliances_subscriber(): 
     def __init__(self, cfg):
@@ -115,16 +120,17 @@ class generalAppliances_subscriber():
             cfg (dict): configuration file
         """
         try:
-            self.port = cfg['port']
-            self.broker = cfg['broker']
-            self.clientID = np.random.randint(1000000000)
+            self.port = cfg['mqtt_port']
+            #self.broker = cfg['broker']
+            self.broker = cfg['mqtt_broker']
+            self.clientID = str(np.random.randint(1000000000))
             self.subscriber = MQTTSubscriber(self.clientID, self.broker, self.port)
             self.subscriber.start()
-            self.subscriber.callbackRegistration(self.subscriber_callback)
-            self.generalAppliances_topic = str(self.clientID)+'_topic'
-            self.subscriber.mySubscribe(self.generalAppliances_topic)
+            #self.subscriber.callbackRegistration(self.subscriber_callback)
+            #self.generalAppliances_topic = str(self.clientID)+'_topic'
+            #self.subscriber.mySubscribe(self.generalAppliances_topic)
         except:
-            logging.info(f'General appliance {self.clientID} does not created')
+            logging.info(f'General appliance does not created')
     
     def subscriber_callback(self, msg):
         pass
@@ -152,16 +158,17 @@ if __name__ == '__main__':
         appliances.append(generalAppliances_subscriber(cfg))
 
     # 5 p.m.
-    EV_timer = perpetualTimer(t=180, hFunction=EV.EV_notify) 
+    status = 1
+    EV_timer = perpetualTimer(t=2, hFunction=EV.EV_notify) 
     EV_timer.start()
 
     # 7 p.m.
-    HW_timer = perpetualTimer(t=90, hFunction=HW.HW_notify)
-    HW_timer.start()
+    #HW_timer = perpetualTimer(t=2, hFunction=HW.HW_notify)
+    #HW_timer.start()
 
     # 8 a.m.
-    SM = perpetualTimer(t=60, hFunction=SM.RTP_notify)
-    SM.start()
+    #SM = perpetualTimer(t=24*60*60, hFunction=SM.RTP_notify)
+    #SM.start()
 
     while True:
         pass

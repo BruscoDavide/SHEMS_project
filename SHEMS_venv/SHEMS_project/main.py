@@ -12,6 +12,7 @@ from mongoDB.database_client import databaseClient
 from optimizationModel.Simulator.instance import Instance
 from optimizationModel.LP_solver.SHEMSModel import SHEMS
 from prosumerCommunity.prosumer_final import Prosumer
+from pushNotification_server.websocket import websocket_server
 
 class SHEMS_main():
     def __init__(self, cfg):
@@ -59,20 +60,8 @@ class SHEMS_main():
                 logging.info(f'Error city coordinates recovering: {response.status_code}')
 
             # Push notification
-            self.server_topic = cfg['server_topic'] # from home to the push server
-            self.client_topic = cfg['client_topic'] # from push server to the final user
-            self.serverID_publisher = 'publisher_server'
-            self.myserver_publisher = MQTTPublisher(self.serverID_publisher, self.broker, self.port)
-            self.myserver_publisher.start()
-            self.serverID_subscriber = 'subscriber_server'
-            self.myserver_subscriber = MQTTSubscriber(self.serverID_subscriber, self.broker, self.port)
-            self.myserver_subscriber.start()
-            self.myserver_subscriber.callbackRegistration(self.myserver_subscriber_callback)
-            self.myserver_subscriber.mySubscribe(self.server_topic)
-            
-            self.homeID_publisher = 'publisher_home'
-            self.home_publisher = MQTTPublisher(self.homeID_publisher, self.broker, self.port)
-            self.home_publisher.start()
+            self.pushnotification_server = websocket_server(cfg['websocket_port'], cfg['websocket_host'])
+
         except:
             logging.info('Environment generation failed')
 
@@ -87,7 +76,7 @@ class SHEMS_main():
         cod = self.shems.solve_definitive()
         if cod == 2:
             try:
-                self.home_publisher.myPublish(self.server_topic, 'First scheduling of the day having success')
+                self.pushnotification_server.action('send', 'First scheduling of the day having success')
                 data = self.databaseClient.read_documents(collection_name='data_collected', document={'_id':'history'})
                 for j in range(60/self.time_granularity*24):
                     data['Phouse_consume'].append(self.shems.Phouse_consume[j])
@@ -191,7 +180,7 @@ class SHEMS_main():
             cod = self.shems.solve_definitive()
             if cod == 2:
                 try:
-                    self.home_publisher.myPublish(self.server_topic, 'New schedling, big amount of hot water used')
+                    self.pushnotification_server.action('send', 'New schedling, big amount of hot water used')
 
                     self.historyData_saving(step)
 
@@ -203,7 +192,7 @@ class SHEMS_main():
         elif msg.topic == self.carStation_topic:
             if msg.payload == 1:
                 self.shems.set_car_arrival()
-                self.home_publisher.myPublish(self.server_topic, 'Electric vehicle in the garage')
+                self.pushnotification_server.action('send', 'Electric vehicle in the garage')
             else: 
                 logging.info('Error in the carStation publisher')
 
@@ -714,15 +703,17 @@ if __name__ == '__main__':
 
     main = SHEMS_main(cfg)
 
-
     main.basicScheduling_thread_callback()
-    """
+
     GUIcommands = perpetualTimer(t=0.5, hFunction=main.GUI_thread_callback)
     GUIcommands.start()
 
     prosumer = Prosumer("shems")
     prosumer_timer = perpetualTimer(t = 15*60, hFunction = prosumer.thread_callback)
     prosumer_timer.start()
-    """
+
+
+
+
     while True:
         pass

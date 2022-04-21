@@ -50,14 +50,14 @@ class MQTTSubscriber():
         # create an instance of paho.mqtt.client 
         self._paho_mqtt = PahoMQTT.Client(self._clientID, False) 
         # register the callbacks
-        self._paho_mqtt.on_connect = self.myOnConnect
-        self._paho_mqtt.on_message = self.myOnMessageReceived
+        self._paho_mqtt.on_connect = self.__myOnConnect
+        self._paho_mqtt.on_message = self.__myOnMessageReceived
         self.__callback = self.__primaryCallback  
 
-    def myOnConnect (self, paho_mqtt, userdata, flags, rc): 
+    def __myOnConnect (self, paho_mqtt, userdata, flags, rc): 
         logging.info(f'Connected to {self.broker} with result code {rc}')
 
-    def myOnMessageReceived (self, paho_mqtt , userdata, msg):
+    def __myOnMessageReceived (self, paho_mqtt , userdata, msg):
         logging.info(f'New messager receiver with topic {msg.topic}, with payload {msg.payload}, with QoS {msg.qos}')
         self.__callback(msg)
 

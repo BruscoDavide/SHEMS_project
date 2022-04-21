@@ -11,7 +11,7 @@ from utilities.mqttclient import MQTTSubscriber, MQTTPublisher
 from mongoDB.database_client import databaseClient
 from optimizationModel.Simulator.instance import Instance
 from optimizationModel.LP_solver.SHEMSModel import SHEMS
-from prosumerCommunity.prosumer_final import Prosumer
+from prosumerCommunity.prosumerMarket import Prosumer
 from pushNotification_server.websocket import websocket_server
 
 class SHEMS_main():
@@ -61,6 +61,7 @@ class SHEMS_main():
 
             # Push notification
             self.pushnotification_server = websocket_server(cfg['websocket_port'], cfg['websocket_host'])
+            # TODO:contronllo del messaggio, piccola encriptazione del messaggio (in più)
 
         except:
             logging.info('Environment generation failed')
@@ -81,7 +82,6 @@ class SHEMS_main():
                 for j in range(60/self.time_granularity*24):
                     data['Phouse_consume'].append(self.shems.Phouse_consume[j])
                 self.databaseClient.update_documents(collection_name='data_collected', document={'_id':'history'}, object=data)
-
             except:
                 logging.info('Error of the home during sending push notification message to the server')
         elif cod == -1:
@@ -145,45 +145,50 @@ class SHEMS_main():
                 else:
                     new_solarRadiation.append(0)
 
-            data = self.databaseClient.read_documents(collection_name='home_configuration', document={'_id':1})
-            data['Tout']=new_temp
-            data['RES_hour_geen'] = new_solarRadiation
-            self.databaseClient.update_documents(collection_name='home_configuration', document={'_id':1}, object=data)
+            data = self.databaseClient.read_documents(collection_name='home_configuration', document={'_id':2})
+            data['home_setpoints']['Tout'] = new_temp
+            self.databaseClient.update_documents(collection_name='home_configuration', document={'_id':2}, object=data)
+            
+            data = self.databaseClient.read_documents(collection_name='home_configuration', document={'_id':5})
+            data['energy']['RES_hour_geen'] = new_solarRadiation
+            self.databaseClient.update_documents(collection_name='home_configuration', document={'_id':5}, object=data)
         else:
             logging.info(f'Weather forecast API response status code: {response.status_code}')    
 
     def sensorsSubscriber_callback(self, msg):
-        """Subscriber fot car station and hot water usage
+        """Subscriber for car station and hot water usage
 
         Args:
             msg (MQTT msg): 
         """
         if msg.topic == self.waterWithdrawn_topic:
             new_data = msg.payload
-            data = self.databaseClient.read_documents(collection_name='home_configuration', document={'_id':2})
-            Wd = data['Wd']
+            data = self.databaseClient.read_documents(collection_name='home_configuration', document={'_id':1})
+            Wd = data['outside_measure']['Wd']
 
             time = str(datetime.datetime.now())
             hh = time.split(' ')[1].split(':')[0]
             mm = time.split(' ')[1].split(':')[1]
-            step = 60/self.time_granularity*hh + math.floor(mm/self.time_granularity) 
+            step = 60/self.time_granularity*hh + math.floor(mm/self.time_granularity) # 0-24 -> 8-8
+            if step - (60/self.time_granularity*8) < 0:
+                step = 60/self.time_granularity*24 + (step - (60/self.time_granularity*8))
+            else:
+                step = step - (8*self.time_granularity)
 
             if new_data > Wd[step]:
                 Wd[step] = new_data
-                data = self.databaseClient.read_documents(collection_name='home_configuration', document={'_id':2})
-                data['Wd']=Wd
-                self.databaseClient.update_documents(collection_name='home_configuration', document={'_id':2}, object=Wd)
+                data = self.databaseClient.read_documents(collection_name='home_configuration', document={'_id':1})
+                data['outside_measure']['Wd'] = Wd
+                self.databaseClient.update_documents(collection_name='home_configuration', document={'_id':1}, object=Wd)
 
             self.instance.get_data_serv()
             self.shems.get_new_instance(self.instance)
-        
+
             cod = self.shems.solve_definitive()
             if cod == 2:
                 try:
                     self.pushnotification_server.action('send', 'New schedling, big amount of hot water used')
-
                     self.historyData_saving(step)
-
                 except:
                     logging.info('Error of the home during sending push notification message to the server')
             elif cod == -1:
@@ -198,7 +203,7 @@ class SHEMS_main():
 
         elif msg.topic == self.smartMeter_topic:
             data = self.databaseClient.read_documents(collection_name='home_configuration', document={'_id':6})
-            data['values']=msg.payload
+            data['RTP']['values']=msg.payload
             self.databaseClient.update_documents('home_configuration', {'_id':6}, data)
 
             self.basicScheduling_thread_callback()
@@ -224,16 +229,19 @@ class SHEMS_main():
             hh = time.split(' ')[1].split(':')[0]
             mm = time.split(' ')[1].split(':')[1]
             step = 60/self.time_granularity*hh + math.floor(mm/self.time_granularity) 
-            #TODO: attenzione che il vettorei parte dalle 8 del mattino fino alle 8 del giorno dopo
+            if step - (60/self.time_granularity*8) < 0:
+                step = 60/self.time_granularity*24 + (step - (60/self.time_granularity*8))
+            else:
+                step = step - (8*self.time_granularity)
 
-            if i['command']=='home': # on at this moment
+            if i['command'] == 'home': # on at this moment
                 data = {}
                 data['listDevices'] = []
                 for j in range(self.shems.instance.N_sched_appliances): # columns
                     if self.shems.ud_out[step][j] == 1:
                         info = self.databaseClient.read_documents(collection_name='home_configuration', document={'_id':4})
                         ob = {}
-                        ob['name'] = info['sched_appliances']['name'][j]
+                        ob['name'] = info['appliances']['sched_appliances']['name'][j]
                         #ob[''] = info['sched_appliances'][''][j]
                         data['listDevices'].append(ob)
                 data['ESS_battery'] = self.shems.Cess[step]
@@ -242,11 +250,11 @@ class SHEMS_main():
 
                 self.append_data(code=timestamp, data=data)
 
-            elif i['command']=='scheduling':
+            elif i['command'] == 'scheduling':
                 data = {}
                 for j in range(self.shems.instance.N_sched_appliances): # columns
                     info = self.databaseClient.read_documents(collection_name='home_configuration', document={'_id':4})
-                    name = info['sched_appliances']['name'][j]
+                    name = info['appliances']['sched_appliances']['name'][j]
                     for i in range(60/self.time_granularity*24-1): # rows 
                         if i != 0 and self.shems.ud_out[i][j] == 1 and self.shems.ud_out[i-1][j] == 0:
                             start = i
@@ -274,27 +282,26 @@ class SHEMS_main():
 
                 self.append_data(code=timestamp, data=data)
 
-            elif i['command']=='changeScheduling':
-                # ad alejo: controlo che si faccia un cambio scheduling di un device che deve ancora essere eseguito e deve concludersi primde delle otto del mattino
-                payload = i['payload'] 
-                payload['command']=1
+            elif i['command'] == 'changeScheduling':
+                # TODOad alejo: controlo che si faccia un cambio scheduling di un device che deve ancora essere eseguito e deve concludersi primde delle otto del mattino
                 # payload['start_time'] == now o data hh:mm da dire ad alwjo
-
+                payload = i['payload'] 
+                payload['command'] = 1
+               
                 self.instance.get_data_serv()
                 self.shems.get_new_instance(self.instance)
 
                 self.shems.set_working_mode(payload)
                 cod = self.shems.solve()
+
                 if cod == 2:
                     self.append_data(code=timestamp, data={'response':'Changing schedluinig success, new scheduling'})
-                
                     self.historyData_saving(step)
-
                 elif cod == -1:
                     logging.info('Changing scheduling failed, no new scheduling')
                     self.append_data(code=timestamp, data={'response':'Changing schedluinig failed, no new scheduling'})
 
-            elif i['command']=='summary':
+            elif i['command'] == 'summary':
                 payload = i['payload']
                 data = self.databaseClient.read_documents(collection_name='data_collected', document={'_id':'history'})
                 requiredData = []
@@ -385,17 +392,15 @@ class SHEMS_main():
                 self.append_data(code=timestamp, data=requiredData)
                 # TODO: fare in modo che i dati più vecchi di un certo periodo vengano compressi per risparmiare spazio (più tardi)
                 
-            elif i['command']=='changeSetpoints':   # ----> {Tin_max/Tin_min:int;Tewh_max/Tewh_min:int;time_dep:datetime object}
+            elif i['command'] == 'changeSetpoints':
                 payload = i['payload']
-                if payload['applaince'] == '': 
-                    # decidere con alejo che nome dare per le batterie setpoints
-                    # aggiungere da id_3: cess thresh_low/high
+                try:
                     data = self.databaseClient.read_documents(collection_name='home_configuration', document={'_id':3})
-                    data[payload['appliance']]=payload['new_value']
+                    data['batteries'][payload['appliance']]=payload['new_value']
                     self.databaseClient.update_documents(collection_name='home_configuration', document={'_id':3}, data=data)
-                else:
+                except:
                     data = self.databaseClient.read_documents(collection_name='home_configuration', document={'_id':0})
-                    data[payload['appliance']]=payload['new_value']
+                    data['home_setpoints'][payload['appliance']]=payload['new_value']
                     self.databaseClient.update_documents(collection_name='home_configuration', document={'_id':0}, data=data)
                 
                 payload['command'] = 0
@@ -407,16 +412,15 @@ class SHEMS_main():
 
                 self.shems.set_working_mode(payload)
                 cod = self.shems.solve_definitive()
+
                 if cod == 2:
                     self.append_data(code=timestamp, data={'response':'Updating setpoint success, new scheduling'})
-
                     self.historyData_saving(step)
-
                 elif cod == -1:
                     logging.info('Updating setpoint failed, no new scheduling')
                     self.append_data(code=timestamp, data={'response':'Updating setpoint failed, no new scheduling'})
 
-            elif i['command']=='addAppliances':
+            elif i['command'] == 'addAppliances':
                 payload = i['payload']
                 data = self.databaseClient.read_documents(collection_name='home_configuration', document={'_id':4})
                 fp = open('./files/appliances_info.json', 'r')
@@ -438,13 +442,13 @@ class SHEMS_main():
                     }
                 }
                 """
-                data['N_sched_appliances'] += 1
-                data['sched_appliances']['name'].append(payload['which'])
-                data['sched_appliances']['running_len'].append(cfg[payload['which']]['running_len'])
-                data['sched_appliances']['num_cycles'].append(cfg[payload['which']]['num_cycles'])
-                data['sched_appliances']['power_cons'].append(cfg[payload['which']]['power_cons'])
-                data['sched_appliances']['c1'].append(cfg[payload['which']]['c1'])
-                data['sched_appliances']['c2'].append(cfg[payload['which']]['c2'])
+                data['appliances']['N_sched_appliances'] += 1
+                data['appliances']['sched_appliances']['name'].append(payload['which'])
+                data['appliances']['sched_appliances']['running_len'].append(cfg[payload['which']]['running_len'])
+                data['appliances']['sched_appliances']['num_cycles'].append(cfg[payload['which']]['num_cycles'])
+                data['appliances']['sched_appliances']['power_cons'].append(cfg[payload['which']]['power_cons'])
+                data['appliances']['sched_appliances']['c1'].append(cfg[payload['which']]['c1'])
+                data['appliances']['sched_appliances']['c2'].append(cfg[payload['which']]['c2'])
                 self.databaseClient.update_documents(collection_name='home_configuration', document={'_id':4}, data=data)
                 del payload['applianceData']
                 payload['command'] = 2
@@ -458,26 +462,24 @@ class SHEMS_main():
                 cod = self.shems.solve_definitive()
                 if cod == 2:
                     self.append_data(code=timestamp, data={'response':'Updating appliances list success, new scheduling'})
-
                     self.historyData_saving(step)
-
                 elif cod == -1:
                     logging.info('Updating appliances list failed, no new scheduling')
                     self.append_data(code=timestamp, data={'response':'Updating appliances list failed, no new scheduling'})
             
-            elif i['command']=='deleteAppliances':
+            elif i['command'] == 'deleteAppliances':
                 payload = i['payload']
                 data = self.databaseClient.read_documents(collection_name='home_configuration', document={'_id':4})
 
-                data['N_sched_appliances'] -= 1
-                for i in data['sched_appliances']['name']:
+                data['appliances']['N_sched_appliances'] -= 1
+                for i in data['appliances']['sched_appliances']['name']:
                     if i == payload['applianceData']['name']:
-                        data['sched_appliances']['name'].pop(i)
-                        data['sched_appliances']['running_len'].pop(i)
-                        data['sched_appliances']['num_cycles'].pop(i)
-                        data['sched_appliances']['power_cons'].pop(i)
-                        data['sched_appliances']['c1'].pop(i)
-                        data['sched_appliances']['c2'].pop(i)
+                        data['appliances']['sched_appliances']['name'].pop(i)
+                        data['appliances']['sched_appliances']['running_len'].pop(i)
+                        data['appliances']['sched_appliances']['num_cycles'].pop(i)
+                        data['appliances']['sched_appliances']['power_cons'].pop(i)
+                        data['appliances']['sched_appliances']['c1'].pop(i)
+                        data['appliances']['sched_appliances']['c2'].pop(i)
                         self.databaseClient.update_documents(collection_name='home_configuration', document={'_id':4}, data=data)
                         del payload['applianceData']
                         payload['command'] = 2
@@ -491,23 +493,20 @@ class SHEMS_main():
                         cod = self.shems.solve_definitive()
                         if cod == 2:
                             self.append_data(code=timestamp, data={'response':'Updating appliances list success, new scheduling'})
-
                             self.historyData_saving(step)
-
                         elif cod == -1:
                             logging.info('Updating appliances list failed')
                             self.append_data(code=timestamp, data={'response':'Updating appliances list failed, no new scheduling'})
                     else:
                         logging.info('Error appliances name wrong, not found')
 
-            elif i['command']=='community':
+            elif i['command'] == 'community':
                 payload = i['payload']
                 data = self.databaseClient.read_documents(collection_name='data_collected', document={'_id':'hisotry'})
                 requiredData = []
                 
                 if payload['when'] == 'day':
                     # devo andare indietro di 24*4 valori
-
                     values = []
                     xlabel = []
                     min = 999999
@@ -595,7 +594,7 @@ class SHEMS_main():
 
                 self.append_data(code=timestamp, data=requiredData)
 
-            elif i['command']=='registration':
+            elif i['command'] == 'registration':
                 try:
                     payload = i['payload']
                     # Minimum and maximum temperature of the environment and of the WH
@@ -617,13 +616,13 @@ class SHEMS_main():
                     cfg = json.load(fp)
                     fp.close()
                     data = self.databaseClient.read_documents(collection_name='home_configuration', document={'_id':4})
-                    data['N_sched_appliances'] += 1
-                    data['sched_appliances']['name'].append(payload['which'])
-                    data['sched_appliances']['running_len'].append(cfg[payload['which']]['running_len'])
-                    data['sched_appliances']['num_cycles'].append(cfg[payload['which']]['num_cycles'])
-                    data['sched_appliances']['power_cons'].append(cfg[payload['which']]['power_cons'])
-                    data['sched_appliances']['c1'].append(cfg[payload['which']]['c1'])
-                    data['sched_appliances']['c2'].append(cfg[payload['which']]['c2'])
+                    data['appliances']['N_sched_appliances'] += 1
+                    data['appliances']['sched_appliances']['name'].append(payload['which'])
+                    data['appliances']['sched_appliances']['running_len'].append(cfg[payload['which']]['running_len'])
+                    data['appliances']['sched_appliances']['num_cycles'].append(cfg[payload['which']]['num_cycles'])
+                    data['appliances']['sched_appliances']['power_cons'].append(cfg[payload['which']]['power_cons'])
+                    data['appliances']['sched_appliances']['c1'].append(cfg[payload['which']]['c1'])
+                    data['appliances']['sched_appliances']['c2'].append(cfg[payload['which']]['c2'])
                     self.databaseClient.update_documents('home_configuration', {'_id':4}, data)
                     
                     self.append_data(code=timestamp, data={'response':'New user registration success'})
@@ -650,23 +649,11 @@ class SHEMS_main():
         except:
             logging.info('Error during the reading of the "main.py" command response') 
 
-    def myserver_subscriber_callback(self, msg):
-        """_summary_
-
-        Args:
-            msg (_type_): _description_
-        """
-        # TODO:contronllo del messaggio, piccola encriptazione del messaggio (in più)
-        try:
-            self.myserver_publisher.myPublish(self.client_topic, msg.payload)
-        except:
-            logging.info('Error of the push notification server')
-
     def historyData_saving(self, step):
-        """_summary_
+        """Storing daily data
 
         Args:
-            step (_type_): _description_
+            step (int): time reference considering the time granularity
         """
         data = self.databaseClient.read_documents(collection_name='data_collected', document={'_id':'history'})
         i = 60/self.time_granularity*24-step
@@ -702,18 +689,12 @@ if __name__ == '__main__':
     fp.close()
 
     main = SHEMS_main(cfg)
-
-    main.basicScheduling_thread_callback()
-
     GUIcommands = perpetualTimer(t=0.5, hFunction=main.GUI_thread_callback)
     GUIcommands.start()
 
     prosumer = Prosumer("shems")
     prosumer_timer = perpetualTimer(t = 15*60, hFunction = prosumer.thread_callback)
     prosumer_timer.start()
-
-
-
 
     while True:
         pass

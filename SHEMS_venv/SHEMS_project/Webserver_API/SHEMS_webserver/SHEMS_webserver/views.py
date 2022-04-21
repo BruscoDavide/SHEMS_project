@@ -8,15 +8,6 @@ from urllib import response
 from django.http.response import HttpResponse
 from django.shortcuts import render
 
-"""
-    #return render(request, "result.html", {"result":res})
-    #request.GET['']
-    return HttpResponse(f"the get request works: {list(mydoc)}")
-    # request.POST['']
-    return HttpResponse("the post request works")
-    return render(request, "home.html")
-"""
-
 commands_path = 'C:\\Users\\davide.brusco\\Documents\\Coding\\SHEMS\\SHEMS_project\\SHEMS_venv\\shems_project\\files\\GUI_thread_commands.json'
 data_path = 'C:\\Users\\davide.brusco\\Documents\\Coding\\SHEMS\\SHEMS_project\\SHEMS_venv\\shems_project\\files\\GUI_thread_data.json'
 

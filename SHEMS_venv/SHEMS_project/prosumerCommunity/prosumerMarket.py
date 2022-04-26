@@ -1,3 +1,4 @@
+from datetime import datetime
 from .MyMQTT import MyMQTT
 import pandas as pd
 import json
@@ -82,6 +83,12 @@ class Prosumer:
                     self.energy_i += msg["energy"]
                     selling_record_tmp = {"name": msg["name"], "energy": -msg["energy"], "price": msg["price"]}
                     self.transaction_record.append(selling_record_tmp)
+
+                    selling_record_tmp['timestamp'] = datetime.now()
+
+                    data = self.databaseClient.read_documents(collection_name='data_collected', document={'_id':'history'})
+                    data['prosumers'].append(selling_record_tmp)
+                    self.databaseClient.update_documents(collection_name='home_configuration', document={'_id':0}, data=data)
                     
         except:
             print("invalid message format")
@@ -182,9 +189,9 @@ class Prosumer:
             print("error in response analysis")
 
     def thread_callback(self):
-        data = self.databaseClient.read_documents(collection_name='data_collected', collection={'_id':'history'}) #TODO: insert correct query, need Pg e RTP
+        data = self.databaseClient.read_documents(collection_name='data_collected', document={'_id':'history'}) #TODO: insert correct query, need Pg e RTP
         Pg_i = data['Pg_market']
-        data = self.databaseClient.read_documents(collection_name='home_configuration', collection={'_id':6})
+        data = self.databaseClient.read_documents(collection_name='home_configuration', document={'_id':6})
         rtp_i = data["RTP"]['values'][self.time_instant_counter]/2
         self.set_instant_params(rtp_i, Pg_i[self.time_instant_counter])
         self.time_instant_counter += 1

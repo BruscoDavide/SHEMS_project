@@ -48,7 +48,6 @@ class websocket_server():
         except websockets.exceptions.ConnectionClosed as e:
             logging.info('A client just disconnected from websocket server')
 
-
 class websocket_client():
     def __init__(self, port, host):
         self.port = port

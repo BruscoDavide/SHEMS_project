@@ -1,0 +1,27 @@
+{
+    "washing_machine": {
+        "name": "washing_machine",
+        "running_len": 2,
+        "num_cycles": 1, 
+        "power_cons": 1.5, 
+        "c1": 1,
+        "c2": 2
+        
+    },
+    "dishwasher": {
+        "name": "dishwasher",
+        "running_len": 2,
+        "num_cycles": 1, 
+        "power_cons": 1.2, 
+        "c1": 1,
+        "c2": 2
+    },
+    "vacuum_cleaner": {
+        "name": "vacuum_cleaner",
+        "running_len": 2,
+        "num_cycles": 1, 
+        "power_cons": 1.2, 
+        "c1": 1,
+        "c2": 2
+    }
+}

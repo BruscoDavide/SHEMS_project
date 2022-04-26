@@ -1,6 +1,7 @@
 import json
 import math
 import logging
+import re
 import requests
 import datetime
 import numpy as np
@@ -14,6 +15,8 @@ from optimizationModel.LP_solver.SHEMSModel import SHEMS
 from prosumerCommunity.prosumerMarket import Prosumer
 from pushNotification_server.websocket import websocket_server
 
+
+# TODO: controllare che l'iteraore i non faccia contrasto con altre i
 class SHEMS_main():
     def __init__(self, cfg):
         """SHEMS system object. It includes the instance of the energy optimization toll, the instance of the MQTT subscriber and publisher and the instance of the push notificator
@@ -61,6 +64,7 @@ class SHEMS_main():
 
             # Push notification
             self.pushnotification_server = websocket_server(cfg['websocket_port'], cfg['websocket_host'])
+
             # TODO:contronllo del messaggio, piccola encriptazione del messaggio (in più)
 
         except:
@@ -82,6 +86,9 @@ class SHEMS_main():
                 for j in range(60/self.time_granularity*24):
                     data['Phouse_consume'].append(self.shems.Phouse_consume[j])
                 self.databaseClient.update_documents(collection_name='data_collected', document={'_id':'history'}, object=data)
+
+                logging.info('riuscito!!!!!!!')
+
             except:
                 logging.info('Error of the home during sending push notification message to the server')
         elif cod == -1:
@@ -167,8 +174,8 @@ class SHEMS_main():
             Wd = data['outside_measure']['Wd']
 
             time = str(datetime.datetime.now())
-            hh = time.split(' ')[1].split(':')[0]
-            mm = time.split(' ')[1].split(':')[1]
+            hh = int(time.split(' ')[1].split(':')[0])
+            mm = int(time.split(' ')[1].split(':')[1])
             step = 60/self.time_granularity*hh + math.floor(mm/self.time_granularity) # 0-24 -> 8-8
             if step - (60/self.time_granularity*8) < 0:
                 step = 60/self.time_granularity*24 + (step - (60/self.time_granularity*8))
@@ -237,54 +244,80 @@ class SHEMS_main():
             if i['command'] == 'home': # on at this moment
                 data = {}
                 data['listDevices'] = []
+                data['single_values'] = {}
                 for j in range(self.shems.instance.N_sched_appliances): # columns
                     if self.shems.ud_out[step][j] == 1:
                         info = self.databaseClient.read_documents(collection_name='home_configuration', document={'_id':4})
                         ob = {}
                         ob['name'] = info['appliances']['sched_appliances']['name'][j]
-                        #ob[''] = info['sched_appliances'][''][j]
+    
+                        for i in range(60/self.time_granularity*24-1): # rows 
+                            if i != 0 and self.shems.ud_out[i][j] == 1 and self.shems.ud_out[i-1][j] == 0:
+                                start = i
+                                ob['starting_time'] = start
+                            elif self.shems.ud_out[i][j] == 1 and self.shems.ud_out[i+1][j] == 0:
+                                end = i
+                                ob['ending_time'] = end
                         data['listDevices'].append(ob)
-                data['ESS_battery'] = self.shems.Cess[step]
-                data['EV_battery'] = self.shems.Cpev[step]
-                data['Phouse'] = self.shems.Phouse_consume[step]
+
+                data['single_values']['ESS_battery'] = self.shems.Cess[step]
+                data['single_values']['EV_battery'] = self.shems.Cpev[step]   
+                data['single_values']['consumption'] = self.shems.Phouse_consume[step]      
 
                 self.append_data(code=timestamp, data=data)
 
             elif i['command'] == 'scheduling':
                 data = {}
+                data['scheduling'] = []
+                data['data'] = []
+                data['label'] = []
                 for j in range(self.shems.instance.N_sched_appliances): # columns
                     info = self.databaseClient.read_documents(collection_name='home_configuration', document={'_id':4})
                     name = info['appliances']['sched_appliances']['name'][j]
                     for i in range(60/self.time_granularity*24-1): # rows 
                         if i != 0 and self.shems.ud_out[i][j] == 1 and self.shems.ud_out[i-1][j] == 0:
                             start = i
-                            data[name]['start']  = start
+                            data['scheduling'][name]['start']  = start
+                            data['scheduling'][name]['data'].append(1)
                         elif self.shems.ud_out[i][j] == 1 and self.shems.ud_out[i+1][j] == 0:
                             end = i
-                            data[name]['end'] = end
+                            data['scheduling'][name]['end'] = end
                             done = 0
                             if end <= step:
                                 done = 1
-                            data[name]['done'] = done
+                            data['scheduling'][name]['done'] = done
+                        data['scheduling'][name]['label'].append((step-i*(self.time_granularity*24)))
+                    
+                    data['scheduling'][name]['consumption'] = info['appliances']['sched_appliances']['power_cons']/(60/self.time_granularity)*info['appliances']['sched_appliances']['running_len']
                 
                 name = 'EWH'
                 for i in range(60/self.time_granularity*24-1): 
                     if i != 0 and self.shems.Tewh_out[i][j] == 1 and self.shems.Tewh_out[i-1][j] == 0:
                         start = i
-                        data[name]['start']  = start
+                        data['scheduling'][name]['start']  = start
+                        data['data'].append(1)
                     elif self.shems.Tewh_out[i][j] == 1 and self.shems.Tewh_out[i+1][j] == 0:
                         end = i
-                        data[name]['end'] = end
+                        data['scheduling'][name]['end'] = end
                         done = 0
                         if end <= step:
                             done = 1
-                        data[name]['done'] = done
+                        data['scheduling'][name]['done'] = done
+                    
+                    data['scheduling'][name]['consumption'] += self.shems.Pewh_out[j]/(60/self.time_granularity)
+
+                    data['scheduling'][name]['label'].append((step-i*(self.time_granularity*24)))
+
+                self.append_data(code=timestamp, data=data)
+            
+            elif i['command'] == 'listDevice':
+                info = self.databaseClient.read_documents(collection_name='home_configuration', document={'_id':4})
+                data = {}
+                data['listDevice'] = info['appliances']['sched_appliances']['name']
 
                 self.append_data(code=timestamp, data=data)
 
             elif i['command'] == 'changeScheduling':
-                # TODOad alejo: controlo che si faccia un cambio scheduling di un device che deve ancora essere eseguito e deve concludersi primde delle otto del mattino
-                # payload['start_time'] == now o data hh:mm da dire ad alwjo
                 payload = i['payload'] 
                 payload['command'] = 1
                
@@ -304,9 +337,86 @@ class SHEMS_main():
             elif i['command'] == 'summary':
                 payload = i['payload']
                 data = self.databaseClient.read_documents(collection_name='data_collected', document={'_id':'history'})
-                requiredData = []
+                requiredData = {}
+                
+                if payload['which'] == 'consumption':
+                    if payload['when'] == 'day':
+                        # devo andare indietro di 24*4 valori
+                        values = []
+                        xlabel = []
+                        min = 999999
+                        max = -999999
+                        m = 0
+                        for i in range(24):
+                            s = 0                        
+                            for j in range(60/self.time_granularity):
+                                s += data['Phouse_consume'][(step-j)*i]
+                            values.append(s/(60/self.time_granularity))
+                            xlabel.append((step-i)*self.time_granularity/60)
+                            if s/(60/self.time_granularity) > max: max = s/(60/self.time_granularity)
+                            if s/(60/self.time_granularity) < min: min = s/(60/self.time_granularity)
+                            m += s/(60/self.time_granularity)
+                        requiredData['data'] = values # values
+                        requiredData['label'] = xlabel # xlabel
+                        requiredData['mean'] = m/24
+                        requiredData['min'] = min
+                        requiredData['max'] = max
 
-                if payload['when'] == 'day':
+                    elif payload['when'] == 'week':
+                        # 24*4*  7
+                        values = []
+                        xlabel = []
+                        min = 999999
+                        max = -999999
+                        m = 0
+                        for i in range (7):
+                            s = 0
+                            for j in range(24*60/self.time_granularity):
+                                s += data['Phouse_consume'][(step-j)*i]
+                            values.append(s/(24*(60/self.time_granularity)))
+                            xlabel.append((step-i*(self.time_granularity*24)))
+                            if s/(24*(60/self.time_granularity)) > max: max = s/(24*(60/self.time_granularity))
+                            if s/(24*(60/self.time_granularity)) < min: min = s/(24*(60/self.time_granularity))
+                            m += s/(24*(60/self.time_granularity))
+                        requiredData['data'] = values # values
+                        requiredData['label'] = xlabel# xlabel
+                        requiredData['mean'] = m/(7)
+                        requiredData['min'] = min
+                        requiredData['max'] = max
+                    
+                    elif payload['when'] == 'month':
+                        # 24*4*  7
+                        min = 999999
+                        max = -999999
+                        m = 0
+                        for i in range (7*4):
+                            s = 0
+                            for j in range(24*60/self.time_granularity):
+                                s += data['Phouse_consume'][(step-j)*i]
+                            if s/(24*(60/self.time_granularity)) > max: max = s/(24*(60/self.time_granularity))
+                            if s/(24*(60/self.time_granularity)) < min: min = s/(24*(60/self.time_granularity))
+                            m += s/(24*(60/self.time_granularity))
+                        requiredData['mean'] = m/(7)
+                        requiredData['min'] = min
+                        requiredData['max'] = max
+
+                    elif payload['when'] == 'year':
+                        # 4*24*7*4*12
+                        min = 999999
+                        max = -999999
+                        m = 0
+                        for i in range (7*4*12):
+                            s = 0
+                            for j in range(24*60/self.time_granularity):
+                                s += data['Phouse_consume'][(step-j)*i]
+                            if s/(24*(60/self.time_granularity)) > max: max = s/(24*(60/self.time_granularity))
+                            if s/(24*(60/self.time_granularity)) < min: min = s/(24*(60/self.time_granularity))
+                            m += s/(24*(60/self.time_granularity))
+                        requiredData['mean'] = m/(7)
+                        requiredData['min'] = min
+                        requiredData['max'] = max
+
+                elif payload['which'] == 'EV_battery':
                     # devo andare indietro di 24*4 valori
                     values = []
                     xlabel = []
@@ -314,9 +424,9 @@ class SHEMS_main():
                     max = -999999
                     m = 0
                     for i in range(24):
-                        s = 0                        
+                        s = 0
                         for j in range(60/self.time_granularity):
-                            s += data['Phouse_consume'][(step-j)*i]
+                            s += self.shems.Cpev[j*i]
                         values.append(s/(60/self.time_granularity))
                         xlabel.append((step-i)*self.time_granularity/60)
                         if s/(60/self.time_granularity) > max: max = s/(60/self.time_granularity)
@@ -328,80 +438,72 @@ class SHEMS_main():
                     requiredData['min'] = min
                     requiredData['max'] = max
 
-                elif payload['when'] == 'week':
-                    # 24*4*  7
+                elif payload['which'] == 'ESS_battery':
+                    # devo andare indietro di 24*4 valori
                     values = []
                     xlabel = []
                     min = 999999
                     max = -999999
                     m = 0
-                    for i in range (7):
+                    for i in range(24):
                         s = 0
-                        for j in range(24*60/self.time_granularity):
-                            s += data['Phouse_consume'][(step-j)*i]
-                        values.append(s/(24*(60/self.time_granularity)))
-                        xlabel.append((step-i*(self.time_granularity*24)))
-                        if s/(24*(60/self.time_granularity)) > max: max = s/(24*(60/self.time_granularity))
-                        if s/(24*(60/self.time_granularity)) < min: min = s/(24*(60/self.time_granularity))
-                        m += s/(24*(60/self.time_granularity))
-                    requiredData['data'] = values # values
-                    requiredData['label'] = xlabel# xlabel
-                    requiredData['mean'] = m/(7)
-                    requiredData['min'] = min
-                    requiredData['max'] = max
-                   
-                elif payload['when'] == 'month':
-                    # 24*4*  7
-                    values = []
-                    xlabel = []
-                    min = 999999
-                    max = -999999
-                    m = 0
-                    for i in range (7*4):
-                        s = 0
-                        for j in range(24*60/self.time_granularity):
-                            s += data['Phouse_consume'][(step-j)*i]
-                        if s/(24*(60/self.time_granularity)) > max: max = s/(24*(60/self.time_granularity))
-                        if s/(24*(60/self.time_granularity)) < min: min = s/(24*(60/self.time_granularity))
-                        m += s/(24*(60/self.time_granularity))
+                        for j in range(60/self.time_granularity):
+                            s += self.shems.Cess[j*i]
+                        values.append(s/(60/self.time_granularity))
+                        xlabel.append((step-i)*self.time_granularity/60)
+                        if s/(60/self.time_granularity) > max: max = s/(60/self.time_granularity)
+                        if s/(60/self.time_granularity) < min: min = s/(60/self.time_granularity)
+                        m += s/(60/self.time_granularity)
                     requiredData['data'] = values # values
                     requiredData['label'] = xlabel # xlabel
-                    requiredData['mean'] = m/(7)
+                    requiredData['mean'] = m/24
                     requiredData['min'] = min
                     requiredData['max'] = max
-                elif payload['when'] == 'year':
-                    # 4*24*7*4*12
-                    values = []
-                    xlabel = []
-                    min = 999999
-                    max = -999999
-                    m = 0
-                    for i in range (7*4*12):
-                        s = 0
-                        for j in range(24*60/self.time_granularity):
-                            s += data['Phouse_consume'][(step-j)*i]
-                        if s/(24*(60/self.time_granularity)) > max: max = s/(24*(60/self.time_granularity))
-                        if s/(24*(60/self.time_granularity)) < min: min = s/(24*(60/self.time_granularity))
-                        m += s/(24*(60/self.time_granularity))
-                    requiredData['data'] = values # values
-                    requiredData['label'] = xlabel # xlabel
-                    requiredData['mean'] = m/(7)
-                    requiredData['min'] = min
-                    requiredData['max'] = max
+                else: 
+                    logging.info('URL summary wrong')
 
                 self.append_data(code=timestamp, data=requiredData)
                 # TODO: fare in modo che i dati più vecchi di un certo periodo vengano compressi per risparmiare spazio (più tardi)
-                
+
+            elif i['command'] == 'oldParameters':
+                info = self.databaseClient.read_documents(collection_name='home_configuration', document={'_id':0})
+                data = {}
+                data['oldParameters']['Tin_max'] = info['home_setpoints']['Tin_max']
+                data['oldParameters']['Tin_min']  = info['home_setpoints']['Tin_min']
+                data['oldParameters']['Tewh_max'] = info['home_setpoints']['Tewh_max']
+                data['oldParameters']['Tewh_min'] = info['home_setpoints']['Tewh_min']
+
+                info = self.databaseClient.read_documents(collection_name='home_configuration', document={'_id':3})
+                data['oldParameters']['Cess_thresh_low'] = info['batteries']['Cess_thresh_low']
+                data['oldParameters']['Cess_thresh_high'] = info['batteries']['Cess_thresh_high']
+                data['oldParameters']['Cpev_thresh_low'] = info['batteries']['Cpev_thresh_low']
+                data['oldParameters']['Cpev_thresh_high'] = info['batteries']['Cpev_thresh_high']
+
+                info = self.databaseClient.read_documents(collection_name='home_configuration', document={'_id':7})
+                data['oldParameters']['time_dep'] = info['batteries']['time_dep']
+             
+                self.append_data(code=timestamp, data=data)
+
             elif i['command'] == 'changeSetpoints':
                 payload = i['payload']
-                try:
-                    data = self.databaseClient.read_documents(collection_name='home_configuration', document={'_id':3})
-                    data['batteries'][payload['appliance']]=payload['new_value']
-                    self.databaseClient.update_documents(collection_name='home_configuration', document={'_id':3}, data=data)
-                except:
-                    data = self.databaseClient.read_documents(collection_name='home_configuration', document={'_id':0})
-                    data['home_setpoints'][payload['appliance']]=payload['new_value']
-                    self.databaseClient.update_documents(collection_name='home_configuration', document={'_id':0}, data=data)
+
+                data = self.databaseClient.read_documents(collection_name='home_configuration', document={'_id':0})
+                data['home_setpoints']['Tin_max'] = payload['oldParameters']['Tin_max']
+                data['home_setpoints']['Tin_min'] = payload['oldParameters']['Tin_min']
+                data['home_setpoints']['Tewh_max'] = payload['oldParameters']['Tewh_max']
+                data['home_setpoints']['Tewh_min'] = payload['oldParameters']['Tewh_min']
+                self.databaseClient.update_documents(collection_name='home_configuration', document={'_id':0}, data = data)
+
+                data = self.databaseClient.read_documents(collection_name='home_configuration', document={'_id':3})
+                data['batteries']['Cess_thresh_low'] = payload['oldParameters']['Cess_thresh_low']
+                data['batteries']['Cess_thresh_high'] = payload['oldParameters']['Cess_thresh_high'] 
+                data['batteries']['Cpev_thresh_low'] = payload['oldParameters']['Cpev_thresh_low']
+                data['batteries']['Cpev_thresh_high'] = payload['oldParameters']['Cpev_thresh_high']
+                self.databaseClient.update_documents(collection_name='home_configuration', document={'_id':3}, data = data)
+
+                data = self.databaseClient.read_documents(collection_name='home_configuration', document={'_id':7})
+                data['time']['time_dep'] = payload['oldParameters']['time_dep']
+                self.databaseClient.update_documents(collection_name='home_configuration', document={'_id':7}, data = data)
                 
                 payload['command'] = 0
                 payload['start_time'] = []
@@ -422,34 +524,32 @@ class SHEMS_main():
 
             elif i['command'] == 'addAppliances':
                 payload = i['payload']
+                
                 data = self.databaseClient.read_documents(collection_name='home_configuration', document={'_id':4})
                 fp = open('./files/appliances_info.json', 'r')
                 cfg = json.load(fp)
                 fp.close()
-                """
-                {
-                    {
-                        name1: {
-                            running_len: ,
-                            num_cycles: ,
-                            ...
-                        }
-                        name2: {
-                            running_len: ,
-                            num_cycles: ,
-                            ...
-                        }
-                    }
-                }
-                """
-                data['appliances']['N_sched_appliances'] += 1
-                data['appliances']['sched_appliances']['name'].append(payload['which'])
-                data['appliances']['sched_appliances']['running_len'].append(cfg[payload['which']]['running_len'])
-                data['appliances']['sched_appliances']['num_cycles'].append(cfg[payload['which']]['num_cycles'])
-                data['appliances']['sched_appliances']['power_cons'].append(cfg[payload['which']]['power_cons'])
-                data['appliances']['sched_appliances']['c1'].append(cfg[payload['which']]['c1'])
-                data['appliances']['sched_appliances']['c2'].append(cfg[payload['which']]['c2'])
+
+                if payload['name'] == 'other':
+                    data['appliances']['N_sched_appliances'] += 1
+                    data['appliances']['sched_appliances']['name'].append('other')
+                    running_len = payload['applianceData']['runnin_len']
+                    running_len = int(running_len/self.time_granularity)
+                    data['appliances']['sched_appliances']['running_len'].append(running_len)
+                    data['appliances']['sched_appliances']['num_cycles'].append(1)
+                    data['appliances']['sched_appliances']['power_cons'].append(payload['applianceData']['power_cons'])
+                    data['appliances']['sched_appliances']['c1'].append(1)
+                    data['appliances']['sched_appliances']['c2'].append(2)
+                else:
+                    data['appliances']['N_sched_appliances'] += 1
+                    data['appliances']['sched_appliances']['name'].append(payload['applianceData']['name'])
+                    data['appliances']['sched_appliances']['running_len'].append(cfg[payload['applianceData']['name']]['running_len'])
+                    data['appliances']['sched_appliances']['num_cycles'].append(cfg[payload['applianceData']['name']]['num_cycles'])
+                    data['appliances']['sched_appliances']['power_cons'].append(cfg[payload['applianceData']['name']]['power_cons'])
+                    data['appliances']['sched_appliances']['c1'].append(cfg[payload['applianceData']]['c1'])
+                    data['appliances']['sched_appliances']['c2'].append(cfg[payload['applianceData']]['c2'])
                 self.databaseClient.update_documents(collection_name='home_configuration', document={'_id':4}, data=data)
+                
                 del payload['applianceData']
                 payload['command'] = 2
                 payload['appliance'] = []
@@ -500,7 +600,7 @@ class SHEMS_main():
                     else:
                         logging.info('Error appliances name wrong, not found')
 
-            elif i['command'] == 'community':
+            elif i['command'] == 'communityPlots':
                 payload = i['payload']
                 data = self.databaseClient.read_documents(collection_name='data_collected', document={'_id':'hisotry'})
                 requiredData = []
@@ -571,6 +671,7 @@ class SHEMS_main():
                     requiredData['mean'] = m/(7)
                     requiredData['min'] = min
                     requiredData['max'] = max
+
                 elif payload['when'] == 'year':
                     # 4*24*7*4*12
                     values = []
@@ -594,35 +695,95 @@ class SHEMS_main():
 
                 self.append_data(code=timestamp, data=requiredData)
 
+            elif i['command'] == 'communityProsumers':
+                data = self.databaseClient.read_documents(collection_name='data_collected', document={'_id':'hisotry'})
+                requiredData = []
+                tot_energy = 0
+                tot_price = 0
+                min_price = 999
+                max_price = -999
+                min_energy = 999
+                max_energy = -999
+                sum_energy = 0
+                sum_price = 0
+                for i in data['prosumers']:
+                    ob = {}
+                    ob['name'] = i['name']
+                    ob['interactions'] += 1
+                    for j in range(len(i['energies'])): 
+                        tot_energy += i['energies'][j]
+                        tot_price += i['energies'][j]*i['prices'][j]
+                        if i['energies'] > max_energy: max_energy = i['energies']
+                        if i['energies'] < min_energy: min_energy = i['energies']
+                        if i['prices'] > max_price: max_price = i['prices']
+                        if i['prices'] < min_price: min_price = i['prices']
+                    ob['tot_energy'] = tot_energy
+                    ob['tot_price'] = tot_price
+                    ob['mean_price'] = sum_price/len(i['energies'])
+                    ob['min_price'] = min_price
+                    ob['max_price'] = max_price
+                    ob['mean_energy'] = sum_energy/len(i['energies'])
+                    ob['min_energy'] = min_energy
+                    ob['max_energy'] = max_energy
+                    
+                    requiredData.append(ob)
+
+                self.append_data(code=timestamp, data=requiredData)      
+
             elif i['command'] == 'registration':
                 try:
                     payload = i['payload']
+                    data = {}
+
+                    data['name'] = payload['family_name']
+
                     # Minimum and maximum temperature of the environment and of the WH
                     data = self.databaseClient.read_documents(collection_name='home_configuration', document={'_id':0})
-                    keys = payload['setpoints'].keys()
-                    for i in keys:
-                        data['home_setpoints'][i]=payload['setpoints'][i]
+                    data['home_setpoints']['Tin_max'] = payload['setpoints']['Tin_max']
+                    data['home_setpoints']['Tin_min'] = payload['setpoints']['Tin_min']
+                    data['home_setpoints']['Tewh_max'] = payload['setpoints']['Tewh_max']
+                    data['home_setpoints']['Tewh_min'] = payload['setpoints']['Tewh_min']
                     self.databaseClient.update_documents('home_configuration', {'_id':0}, data)
 
-                    # Departure car time, minimum and maximum threashold charging level 
+                    # Departure car time, minimum and maximum threashold charging level (home and EV)
                     data = self.databaseClient.read_documents(collection_name='home_configuration', document={'_id':3})
-                    data['batteries']['.......'] = payload['EV']['time'] # metti nomi giudto: questo id_ 7
-                    data['batteries']['........'] = payload['EV']['minimum']
-                    data['batteries']['........'] = payload['EV']['maximum']
+                    data['batteries']['Cpev_thresh_low'] = payload['EV']['minimum']
+                    data['batteries']['Cpev_thresh_high'] = payload['EV']['maximum']
+                    data['batteries']['Cess_thresh_low'] = payload['home_batteries']['Cess_thresh_low']
+                    data['batteries']['Cess_thresh_high'] = payload['home_batteries']['Cess_thresh_high'] 
                     self.databaseClient.update_documents('home_configuration', {'_id':3}, data)
+
+                    data = self.databaseClient.read_documents(collection_name='home_configuration', document={'_id':7})
+                    data['time']['time_dep'] = payload['EV']['time']
+                    self.databaseClient.update_documents('home_configuration', {'_id':7}, data)
 
                     # appliances:[modello, lavatrice-lavastovigle-vacuum cliner]
                     fp = open('./files/appliances_info.json', 'r')
                     cfg = json.load(fp)
                     fp.close()
+
                     data = self.databaseClient.read_documents(collection_name='home_configuration', document={'_id':4})
-                    data['appliances']['N_sched_appliances'] += 1
-                    data['appliances']['sched_appliances']['name'].append(payload['which'])
-                    data['appliances']['sched_appliances']['running_len'].append(cfg[payload['which']]['running_len'])
-                    data['appliances']['sched_appliances']['num_cycles'].append(cfg[payload['which']]['num_cycles'])
-                    data['appliances']['sched_appliances']['power_cons'].append(cfg[payload['which']]['power_cons'])
-                    data['appliances']['sched_appliances']['c1'].append(cfg[payload['which']]['c1'])
-                    data['appliances']['sched_appliances']['c2'].append(cfg[payload['which']]['c2'])
+                    
+                    for i in payload['appliances']:
+                        if i['name'] == 'other':
+                            data['appliances']['N_sched_appliances'] += 1
+                            data['appliances']['sched_appliances']['name'].append('other')
+                            running_len = payload['applianceData']['runnin_len']
+                            running_len = int(running_len/self.time_granularity)
+                            data['appliances']['sched_appliances']['running_len'].append(running_len)
+                            data['appliances']['sched_appliances']['num_cycles'].append(1)
+                            data['appliances']['sched_appliances']['power_cons'].append(i['power_cons'])
+                            data['appliances']['sched_appliances']['c1'].append(1)
+                            data['appliances']['sched_appliances']['c2'].append(2)
+                        else:
+                            data['appliances']['N_sched_appliances'] += 1
+                            data['appliances']['sched_appliances']['name'].append(i['name'])
+                            data['appliances']['sched_appliances']['running_len'].append(cfg[i['appliances']['name']]['running_len'])
+                            data['appliances']['sched_appliances']['num_cycles'].append(cfg[i['appliances']['name']]['num_cycles'])
+                            data['appliances']['sched_appliances']['power_cons'].append(cfg[i['appliances']['name']]['power_cons'])
+                            data['appliances']['sched_appliances']['c1'].append(cfg[i['appliances']]['c1'])
+                            data['appliances']['sched_appliances']['c2'].append(cfg[i['appliances']]['c2'])
+                    
                     self.databaseClient.update_documents('home_configuration', {'_id':4}, data)
                     
                     self.append_data(code=timestamp, data={'response':'New user registration success'})

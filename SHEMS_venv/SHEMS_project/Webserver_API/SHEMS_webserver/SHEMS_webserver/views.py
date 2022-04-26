@@ -108,6 +108,18 @@ def scheduling(request):
     data = read_data(command='scheduling', code=code)
     return HttpResponse(data)
 
+def listDevice(request):
+    """ List of actual appliances scheduling
+
+    Args:
+        request (HTTP request): GET request
+    Returns:
+        HttpResponse object
+    """
+    code = append_commands(command='listDevice', flag_payload=False)
+    data = read_data(command='listDevice', code=code)
+    return HttpResponse(data)
+
 def changeScheduling(request):
     """ Change the schedule of one appliance, it requires when move the schedule and which appliance will be moved
         when = -1 it means now
@@ -150,6 +162,19 @@ def summary(request):
     except:
         return HttpResponse('Error "which" or "when" field missing')
 
+def oldParameters(request):
+    """ List of actual home parameters
+
+    Args:
+        request (HTTP request): GET request
+    Returns:
+        HttpResponse object
+    """
+    code = append_commands(command='oldParameters', flag_payload=False)
+    data = read_data(command='oldParameters', code=code)
+    return HttpResponse(data)
+
+
 def settings(request):
     """ Allows to update or change home configuration setpoints, delete or add home appliances 
 
@@ -167,8 +192,7 @@ def settings(request):
     if request.POST['action'] == 'changeSetpoints':
         try:
             payload = {}
-            payload['appliance'] = request.POST['object']
-            payload['new_value'] = request.POST['new_value']
+            payload['new_values'] = request.POST['new_values']
             code = append_commands(command='changeSetpoints', flag_payload=True, payload=payload)
             data = read_data(command='changeSetpoints')
             return HttpResponse(data)
@@ -178,7 +202,18 @@ def settings(request):
         try:
             payload = {}
             payload = request.POST['applianceData']
-            code = append_commands(command='change_setpoints', flag_payload=True, payload=payload)
+            """
+            {applianceData: {
+                name: name_object,
+                power_cons: # potenza istantanea
+                running_length: # minutes...
+            }}
+                num_cycles:
+                c1 = 1 
+                c2 = 2
+            }} 
+            """
+            code = append_commands(command='addAppliances', flag_payload=True, payload=payload)
             data = read_data(command='addAppliances')
             return HttpResponse(data)
         except:
@@ -195,7 +230,7 @@ def settings(request):
     else:
         return HttpResponse('Error "action" field missing or wrong')
 
-def community(request):
+def communityPlots(request):
     """Statistical information about prosumer community
 
     Args:
@@ -212,6 +247,21 @@ def community(request):
         return HttpResponse(data)
     except:
         return HttpResponse('Error "period" or "object" field missing')
+
+def communityProsumers(request):
+    """Statistical information about prosumer community
+
+    Args:
+        request (HTTP request): GET request
+    Returns:
+        HttpResponse object
+    """
+    try:
+        code = append_commands(command='community', flag_payload=True)
+        data = read_data(command='community', code=code)
+        return HttpResponse(data)
+    except:
+        return HttpResponse('!!!!!!!')
 
 def registration(request):
     """Home registration in the system

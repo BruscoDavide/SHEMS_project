@@ -166,8 +166,8 @@ if __name__ == '__main__':
     HW_timer = perpetualTimer(t=2, hFunction=HW.HW_notify)
     HW_timer.start()
 
-    # 8 a.m.
-    SM = perpetualTimer(t=24*60*60, hFunction=SM.RTP_notify)
+    # 8 a.m.   24*60*60
+    SM = perpetualTimer(t=30, hFunction=SM.RTP_notify)
     SM.start()
 
     while True:

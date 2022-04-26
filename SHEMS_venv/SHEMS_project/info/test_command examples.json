@@ -32,7 +32,7 @@
             "command": "summary", // get: SHEMS/summary?period=day&object=consumption
             payload:{
                 "period":"day/week/month/year",
-                "object":"consumption/sold/bought/RTP",
+                "object":"consumption",
             }
             "timestamp":datatime object
             # statististics: xlabel, data:?????? energy consumption / energy sold and bought (DAY, WEEK, single data for mounth, for year)        },
@@ -41,7 +41,7 @@
         {
             "command": "settings", // post: SHEMS/settings   body:payload
             "payload":{
-                "action":"change_timestamp",
+                "action":"c",
                 "object":"temperature",
                 "new_value":20
             }
@@ -52,7 +52,7 @@
             }
             "payload":{
                 "action":"delete_appliances"
-                "object":"AC"
+                "applianceDate":"AC"
             }
             "timestamp":datatime object
             

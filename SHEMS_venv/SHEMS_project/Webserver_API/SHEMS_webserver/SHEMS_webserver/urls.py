@@ -4,15 +4,15 @@ from . import views
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('SHEMS/home', views.home, name = 'SHEMS/home'),
-    path('SHEMS/scheduling', views.scheduling, name='SHEMS/scheduling'),
-    path('SHEMS/changeScheduling/listDevice', views.listDevice, name = 'SHEMS/changeScheduling/listDevice'),
-    path('SHEMS/changeScheduling', views.changeScheduling, name='SHEMS/changeScheduling'),
-    path('SHEMS/summary', views.summary, name='SHEMS/summary'),
-    path('SHEMS/settings/oldParameters', views.oldParameters, name='SHEMS/settings/oldParameters'),
-    path('SHEMS/settings',  views.settings, name='SHEMS/settings'),
-    path('SHEMS/community/plots', views.communityPlots, name='SHEMS/community/plots'),
-    path('SHEMS/community/prosumers', views.communityProsumers, name='SHEMS/community/prosumers'),
-    path('SHEMS/registration', views.registration, name='SHEMS/registration')
+    path('home', views.home, name = 'home'),
+    path('scheduling', views.scheduling, name='scheduling'),
+    path('changeScheduling/listDevice', views.listDevice, name = 'changeScheduling/listDevice'),
+    path('changeScheduling', views.changeScheduling, name='changeScheduling'),
+    path('summary', views.summary, name='summary'),
+    path('settings/oldParameters', views.oldParameters, name='settings/oldParameters'),
+    path('settings',  views.settings, name='settings'),
+    path('community/plots', views.communityPlots, name='community/plots'),
+    path('community/prosumers', views.communityProsumers, name='community/prosumers'),
+    path('registration', views.registration, name='registration')
     
 ]

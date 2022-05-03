@@ -534,7 +534,7 @@ class SHEMS_main():
                         data['oldParameters']['Cpev_thresh_high'] = info['batteries']['Cpev_thresh_high']
 
                         info = self.databaseClient.read_documents(collection_name='home_configuration', document={'_id':7})
-                        data['oldParameters']['time_dep'] = info['batteries']['time_dep']
+                        data['oldParameters']['Time_deperature'] = info['batteries']['time_dep']
 
                         self.__append_data(code=timestamp, data=data)
 
@@ -601,10 +601,10 @@ class SHEMS_main():
                     cfg = json.load(fp)
                     fp.close()
 
-                    if payload['name'] == 'other':
+                    if i['name'] != 'washing_machine' or i['name'] != 'dishwasher' or i['name'] != 'vacuum_cleaner':
                         data['appliances']['N_sched_appliances'] += 1
                         data['appliances']['sched_appliances']['name'].append('other')
-                        running_len = payload['applianceData']['runnin_len']
+                        running_len = payload['applianceData']['running_len']
                         running_len = int(running_len/self.time_granularity)
                         data['appliances']['sched_appliances']['running_len'].append(running_len)
                         data['appliances']['sched_appliances']['num_cycles'].append(1)
@@ -803,6 +803,14 @@ class SHEMS_main():
                                 if i['energies'] < min_energy: min_energy = i['energies']
                                 if i['prices'] > max_price: max_price = i['prices']
                                 if i['prices'] < min_price: min_price = i['prices']
+                            """
+                            tot_energy_sold
+                            tot_energy_bought
+                            mean_price_sold
+                            min_price_bought
+                           
+
+                            """
                             ob['tot_energy'] = tot_energy
                             ob['tot_price'] = tot_price
                             ob['mean_price'] = sum_price/len(i['energies'])
@@ -839,14 +847,16 @@ class SHEMS_main():
 
                         # Departure car time, minimum and maximum threashold charging level (home and EV)
                         data = self.databaseClient.read_documents(collection_name='home_configuration', document={'_id':3})
-                        data['batteries']['Cpev_thresh_low'] = payload['EV']['minimum']
-                        data['batteries']['Cpev_thresh_high'] = payload['EV']['maximum']
+                        data['batteries']['Cpev_thresh_low'] = payload['EV']['Cpev_thresh_low']
+                        data['batteries']['Cpev_thresh_high'] = payload['EV']['Cpev_thresh_high']
                         data['batteries']['Cess_thresh_low'] = payload['home_batteries']['Cess_thresh_low']
                         data['batteries']['Cess_thresh_high'] = payload['home_batteries']['Cess_thresh_high'] 
                         code = code*self.databaseClient.update_documents('home_configuration', {'_id':3}, data)
 
                         data = self.databaseClient.read_documents(collection_name='home_configuration', document={'_id':7})
-                        data['time']['time_dep'] = payload['EV']['time']
+                        data['time']['time_dep'] = payload['EV']['Time_departure']
+
+                        # None -> for not having the car
                         code = code*self.databaseClient.update_documents('home_configuration', {'_id':7}, data)
 
                         # appliances:[modello, lavatrice-lavastovigle-vacuum cliner]
@@ -856,10 +866,10 @@ class SHEMS_main():
                         data = self.databaseClient.read_documents(collection_name='home_configuration', document={'_id':4})
 
                         for i in payload['applianceData']:
-                            if i['name'] == 'other':
+                            if i['name'] != 'washing_machine' or i['name'] != 'dishwasher' or i['name'] != 'vacuum_cleaner':
                                 data['appliances']['N_sched_appliances'] += 1
                                 data['appliances']['sched_appliances']['name'].append('other')
-                                running_len = i['runnin_len']
+                                running_len = i['running_len']
                                 running_len = int(running_len/self.time_granularity)
                                 data['appliances']['sched_appliances']['running_len'].append(running_len)
                                 data['appliances']['sched_appliances']['num_cycles'].append(1)

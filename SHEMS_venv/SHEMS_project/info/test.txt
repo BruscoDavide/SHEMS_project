@@ -1,0 +1,34 @@
+registration
+POST 
+{
+    "EV": {
+        "minimum": 20,
+        "maximum": 80,
+        "time": "8:30:00"
+    },
+    "setpoints": {
+        "Tin_max": 22,
+        "Tin_min": 18,
+        "Tewh_max": 40,
+        "Tewh_min": 30
+    },
+    "home_batteries": {
+        "Cess_thresh_low":15,
+        "Cess_thresh_high":85
+    },
+    "applianceData" :[{
+        "name": "other",
+        "power_cons": 1,
+        "runnin_len": 4
+    },
+    {
+        "name":"washing_machine"
+    },
+    {
+        "name":"dishwasher"
+    }],
+    "family_name": "Brusco"
+}
+home
+scheduling
+prosumer

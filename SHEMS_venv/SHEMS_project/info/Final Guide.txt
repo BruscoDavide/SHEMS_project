@@ -68,3 +68,7 @@ starting_configuration,json
 	"server_topic": "push_notification",
 	"client_topic": "client_test"
 }
+
+RUN THE SYSTEM
+lunch the server
+lunch the main

@@ -1,17 +1,19 @@
 import json
 import logging
 import datetime
-import os
 
-from argparse import Action
 from urllib import response
 from django.http.response import HttpResponse
 from django.shortcuts import render
 
-commands_path = 'C:\\Users\\davide.brusco\\Documents\\Coding\\SHEMS\\SHEMS_project\\SHEMS_venv\\shems_project\\files\\GUI_thread_commands.json'
-data_path = 'C:\\Users\\davide.brusco\\Documents\\Coding\\SHEMS\\SHEMS_project\\SHEMS_venv\\shems_project\\files\\GUI_thread_data.json'
+#TODO: RENDERE INDIPENDENTE DAL PATH 
+fp = open("C:\\Users\\davide.brusco\\Documents\\Coding\\SHEMS\\SHEMS_project\\SHEMS_venv\\shems_project\\files\\starting_configuration.json")
+data = json.load(fp)
+fp.close()
+commands_path = data['webServer_command_path']
+data_path = data['webServer_data_path']
 
-def append_commands(command, flag_payload, payload=None):
+def __append_commands(command, flag_payload, payload=None):
     """Once a command is recevied from HTTP protocol, it is written in the GUI_thread_command.json file
     A new dictionary 'data' is appended to the list: 'command_list':[]
     data: {
@@ -21,69 +23,75 @@ def append_commands(command, flag_payload, payload=None):
     }
 
     Args:
-        command (string): 'home', 'appliances', 'scheduling', 'changeScheduling', 'summary', 'settings', 'community', 'registration'
+        command (string): 'home', 'appliances', 'scheduling', 'changeScheduling', 'summary', 'settings', 'communityPlots', 'communityProsumers', 'registration', 'listDevice', 'oldParameters'
+        flag_payload (boolean)
+        payload (dict, None)
     Returns:
         code (string): timestamp (h:m:s)
     """
-    commands = ['home', 'appliances', 'scheduling', 'changeScheduling', 'summary', 'settings', 'community', 'registration']
+    commands = ['home', 'appliances', 'scheduling', 'changeScheduling', 'summary', 'settings', 'communityPlots', 'communityProsumers', 'registration', 'listDevice', 'oldParameters']
     if command in commands:
         try:
-            fp = open(commands_path, 'r')
+            fp = open(commands_path)
             file = json.load(fp)
             fp.close()
-            
+
             code = str(datetime.datetime.now()).split('.')[0]
             data = {
                 "command": command,
                 "timestamp": code
             }
             if flag_payload:
-                data['payload']=payload
-            file['command_list'].append(data)
-
+                data['payload'] = payload
+            file['commands_list'].append(data)
+            
             fp = open(commands_path, 'w')
             json.dump(file,fp)
             fp.close()
             return code
         except:
-            logging.info('GUI_thread_commands.json error')
+            logging.error('File GUI_thread_commands.json error')
     else:
-        logging.info('Command error')
+        logging.error('Command GUI_thread commands.json error')
 
-def read_data(command, code):
+def __read_data(code):
     """Reading response from 'main.py' to a specific command
 
     Args:
-        command (string): 'home', 'appliances', 'scheduling', 'changeScheduling', 'summary', 'settings', 'community', 'registration' 
         code (string): timestamp (h:m:s) when the command is received from the webserver
     Returns:
         dictionary: data response of a specific command
     """
     flag = True
     c = 0
-    t = 100 # da testare 
+    t = 1000000 # tested
+
     while flag:
-        fp = open(data_path, 'r')
-        file = json.load(fp)
-        fp.close()
-        
         try:
-            data = file['responses'][code]
-            del file['response'][code]
+            fp = open(data_path)
+            file = json.load(fp)
+            fp.close()
+            
+            response = file['responses'][str(code)]
+            del file['responses'][str(code)]
+            flag = False
+
             fp = open(data_path, 'w')
             json.dump(file, fp)
             fp.close()
-
-            flag = False
-
-            return data
+            
+            break
         except:
             c += 1
-            if c==t:
-                logging.info('Command request cannot be satisfy: error "code" or "main.py" offline') 
+            if c == t:
                 flag = False
-                return 'Command request cannot be satisfy: error "code" or "main.py" offline'
-                
+    if c == t:
+        logging.error('Command request cannot be satisfy: error "code" or "main.py" offline') 
+        HttpResponse({'response':'Command request cannot be satisfy: error "code" or "main.py" offline'})
+    else:
+        logging.info('Operation complete')
+        HttpResponse(response)
+
 def home(request):
     """Application home page 
 
@@ -92,8 +100,8 @@ def home(request):
     Returns:
         HttpResponse object
     """
-    code = append_commands(command='home', flag_payload=False)
-    data = read_data(command='home', code=code)
+    code = __append_commands(command='home', flag_payload=False)
+    data = __read_data(code=code)
     return HttpResponse(data)
         
 def scheduling(request):
@@ -104,8 +112,8 @@ def scheduling(request):
     Returns:
         HttpResponse object
     """
-    code = append_commands(command='scheduling', flag_payload=False)
-    data = read_data(command='scheduling', code=code)
+    code = __append_commands(command='scheduling', flag_payload=False)
+    data = __read_data(code=code)
     return HttpResponse(data)
 
 def listDevice(request):
@@ -116,8 +124,8 @@ def listDevice(request):
     Returns:
         HttpResponse object
     """
-    code = append_commands(command='listDevice', flag_payload=False)
-    data = read_data(command='listDevice', code=code)
+    code = __append_commands(command='listDevice', flag_payload=False)
+    data = __read_data(code=code)
     return HttpResponse(data)
 
 def changeScheduling(request):
@@ -134,13 +142,15 @@ def changeScheduling(request):
         HttpResponse object
     """
     try:
+        data = json.loads(request.body)
         payload = {}
-        payload['start_time'] = request.POST['when']
-        payload['appliance'] = request.POST['which']
-        code = append_commands(command='changeScheduling', flag_payload=True, payload=payload)
-        data = read_data(command='changeScheduling', code=code)
+        payload['start_time'] = data['when']
+        payload['appliance'] = data['which']
+        code = __append_commands(command='changeScheduling', flag_payload=True, payload=payload)
+        data = __read_data(code=code)
         return HttpResponse(data)
     except:
+        logging.error('Error "which" or "when" field missing - changeSchduling request')
         return HttpResponse('Error "which" or "when" field missing')
 
 def summary(request):
@@ -154,13 +164,14 @@ def summary(request):
     """
     try:
         payload = {}
-        payload['when'] = request.GET['period']
-        payload['which'] = request.GET['object']
-        append_commands(command='summary', flag_payload=True, payload=payload)
-        data = read_data(command='summary')
+        payload['start_time'] = request.GET['period']
+        payload['appliance'] = request.GET['object']
+        code = __append_commands(command='summary', flag_payload=True, payload=payload)
+        data = __read_data(code=code)
         return HttpResponse(data)
     except:
-        return HttpResponse('Error "which" or "when" field missing')
+        logging.error('Error "object" or "period" field missing - summary request')
+        return HttpResponse('Error "period" or "object" field missing')
 
 def oldParameters(request):
     """ List of actual home parameters
@@ -170,10 +181,9 @@ def oldParameters(request):
     Returns:
         HttpResponse object
     """
-    code = append_commands(command='oldParameters', flag_payload=False)
-    data = read_data(command='oldParameters', code=code)
+    code = __append_commands(command='oldParameters', flag_payload=False)
+    data = __read_data(code=code)
     return HttpResponse(data)
-
 
 def settings(request):
     """ Allows to update or change home configuration setpoints, delete or add home appliances 
@@ -189,19 +199,22 @@ def settings(request):
     Returns:
         HttpResponse object
     """
-    if request.POST['action'] == 'changeSetpoints':
+    data = json.loads(request.body)
+    if data['action'] == 'changeSetpoints':
         try:
             payload = {}
-            payload['new_values'] = request.POST['new_values']
-            code = append_commands(command='changeSetpoints', flag_payload=True, payload=payload)
-            data = read_data(command='changeSetpoints')
+            payload['new_values'] = data['new_values']
+            code = __append_commands(command='changeSetpoints', flag_payload=True, payload=payload)
+            data = __read_data(code=code)
             return HttpResponse(data)
         except:
+            logging.error('Error "new_values" field missing - changeSetpoints request')
             return HttpResponse('Error "action" or "new_value" field missing')
-    elif request.POST['action'] == 'addAppliances':
+
+    elif data['action'] == 'addAppliances':
         try:
             payload = {}
-            payload = request.POST['applianceData']
+            payload = data['applianceData']
             """
             {applianceData: {
                 name: name_object,
@@ -213,19 +226,22 @@ def settings(request):
                 c2 = 2
             }} 
             """
-            code = append_commands(command='addAppliances', flag_payload=True, payload=payload)
-            data = read_data(command='addAppliances')
+            code = __append_commands(command='addAppliances', flag_payload=True, payload=payload)
+            data = __read_data(code=code)
             return HttpResponse(data)
         except:
+            logging.error('Error "applianceData" field missing - addAppliances request')
             return HttpResponse('Error "applianceData" field missing')
-    elif request.POST['action'] == 'deleteAppliances':
+
+    elif data['action'] == 'deleteAppliances':
         try:
             payload = {}
-            payload = request.POST['applianceData']
-            data = append_commands(command='delete_appliances', flag_payload=True, payload=payload)
-            data = read_data(command='deleteAppliances')
+            payload = data['applianceData']
+            data = __append_commands(command='delete_appliances', flag_payload=True, payload=payload)
+            data = __read_data(code=code)
             return HttpResponse(data)
         except:
+            logging.error('Error "applianceData" field missing - deleteAppliances request')
             return HttpResponse('Error "applianceData" field missing')
     else:
         return HttpResponse('Error "action" field missing or wrong')
@@ -240,12 +256,13 @@ def communityPlots(request):
     """
     try:
         payload = {}
-        payload['period'] = request.GET['period']
-        payload['object'] = request.GET['object']
-        code = append_commands(command='community', flag_payload=True, payload=payload)
-        data = read_data(command='community', code=code)
+        payload['when'] = request.GET['period']
+        payload['which'] = request.GET['object']
+        code = __append_commands(command='community', flag_payload=True, payload=payload)
+        data = __read_data(code=code)
         return HttpResponse(data)
     except:
+        logging.error('Error "period" or "object" field missing - communityPlots request')
         return HttpResponse('Error "period" or "object" field missing')
 
 def communityProsumers(request):
@@ -256,12 +273,9 @@ def communityProsumers(request):
     Returns:
         HttpResponse object
     """
-    try:
-        code = append_commands(command='community', flag_payload=True)
-        data = read_data(command='community', code=code)
-        return HttpResponse(data)
-    except:
-        return HttpResponse('!!!!!!!')
+    code = __append_commands(command='community', flag_payload=True)
+    data = __read_data(code=code)
+    return HttpResponse(data)
 
 def registration(request):
     """Home registration in the system
@@ -276,12 +290,19 @@ def registration(request):
         HttpResponse object
     """
     try:
+        data = json.loads(request.body)
         payload = {}
-        payload['EV'] = request.POST['EV']
-        payload['setpoints'] = request.POST['setpoints']
-        payload['appliances'] = request.POST['applianceData']
-        code = append_commands(command='registration', flag_payload=True, payload=payload)
-        data = read_data(command='registration', code=code)
+        payload['family_name'] = data['family_name']
+        payload['EV'] = data ['EV']
+        payload['setpoints'] = data ['setpoints']
+        payload['applianceData'] = data ['applianceData']
+        payload['home_batteries'] = data['home_batteries']
+
+        code = __append_commands(command='registration', flag_payload=True, payload=payload)
+        data = __read_data(code=code)
         return HttpResponse(data)
     except:
-        return HttpResponse('Error "new_home" field missing')
+        logging.error('Error new home field missing - registration request')
+        return HttpResponse('Error new home field missing')
+    
+    

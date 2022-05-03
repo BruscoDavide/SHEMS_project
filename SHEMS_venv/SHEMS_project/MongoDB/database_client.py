@@ -26,12 +26,8 @@ class databaseClient():
             self.name = 'SHEMS_database_local'
         except:
             logging.info('MongoDB client creation failed')
-
-    def databasePointer(self, type):
-        if type == 'local':
-            return self.db.SHEMS_database_local
     
-    def collectionPointer(self, collection_name):
+    def __collectionPointer(self, collection_name):
         """Get or create a collection pointer
 
         Args:
@@ -54,10 +50,10 @@ class databaseClient():
             collection (string): collection name
         """
         try:
-            pointer = self.collectionPointer(collection_name)
+            pointer = self.__collectionPointer(collection_name)
             pointer.insert_one(document)
         except:
-            logging.info('Write document failed')
+            logging.info('Writing document failed')
 
     def count_documents(self, collection_name):
         """Count the number of documents in a specific collection
@@ -68,10 +64,10 @@ class databaseClient():
                 int: number of documents in the collection
         """
         try:
-            pointer = self.collectionPointer(collection_name)
+            pointer = self.__collectionPointer(collection_name)
             return list(pointer.count())
         except:
-            logging.info('Count document failed')
+            logging.info('Counting document failed')
 
     def read_documents(self, collection_name, document):
         """Read documents from a specific collection
@@ -80,17 +76,16 @@ class databaseClient():
             collection (string): collection name
 
         Returns:
-            _type_: _description_
+            mongoDB object:
         """
         try:
-            pointer = self.collectionPointer(collection_name)
-
+            pointer = self.__collectionPointer(collection_name)
             d = {}
             for i in pointer.find(document):
                 d=i
             return d
         except:
-            logging.info('Read document failed')
+            logging.info('Reading document failed')
 
     def update_documents(self, collection_name, document, object):
         """Update a field of the documents of a collection
@@ -100,13 +95,16 @@ class databaseClient():
             ID (dict): dictionary compose like {document_identificator:document_indetificator_value}
             object: dictionary with the field update
         Returns:
-            _type_: _description_
+            code (int): 1/0
         """
         try:
-            pointer = self.collectionPointer(collection_name)
-            return list(pointer.update_one(document, {'$set': object}))
+            pointer = self.__collectionPointer(collection_name)
+            pointer.update_one(document, {'$set': object})
+            logging.info('Update document success')
+            return 1
         except:
             logging.info('Update document failed')
+            return 0
 
     def delete_documents(self, collection_name, document):
         """delete a documents from a collection
@@ -118,14 +116,7 @@ class databaseClient():
             _type_: _description_
         """
         try:
-            pointer = self.collectionPointer(collection_name)
+            pointer = self.__collectionPointer(collection_name)
             return list(pointer.delete_one(document))
         except:
             logging.info('Delete document failed')
-
-    def server_info(self):
-        #server_info = self.client.server_info() 
-        #keys = server_info.keys(), 
-        #db_names = self.client.list_database_names()
-        #return server_info, keys, db_names, self.collections
-        return self.collections

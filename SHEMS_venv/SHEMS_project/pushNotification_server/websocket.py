@@ -12,11 +12,11 @@ class websocket_server():
         self.payload = ''
 
     def action(self, a, payload = None):
-        """_summary_
+        """Defines the typology of message and provides it
 
         Args:
-            a (_type_): _description_
-            payload (_type_, optional): _description_. Defaults to None.
+            a (string): echo, send
+            payload (string, optional): message contenent. Defaults to None.
         """
         if a == 'echo':
             start_server = websockets.serve(self.__echo(), self.host, self.port)
@@ -27,7 +27,7 @@ class websocket_server():
             start_server = websockets.serve(self.__send(), self.host, self.port)
             asyncio.get_event_loop().run_until_complete(start_server)
         else:
-            logging.info('Action wrong')  
+            logging.error('Action inserted wrong (websocket)')  
 
     async def __echo(self, websocket, path):
         logging.info('A client just connected to websocket server')
@@ -35,7 +35,7 @@ class websocket_server():
             async for message in websocket:
                 logging.info(f'Received message from client: {message}')
 
-                # ho ricevuto un messaggio dal client cosa devo fare??????
+                # TODO: ho ricevuto un messaggio dal client cosa devo fare??????, in realtà noi non abbiamo questa opzione
                 
                 await websocket.send("Pong: " + message)
         except websockets.exceptions.ConnectionClosed as e:
@@ -56,11 +56,11 @@ class websocket_client():
         self.payload = ''
 
     def action(self, a, payload=None):
-        """_summary_
+        """Defines the typology of message and provides it
 
         Args:
-            a (_type_): _description_
-            payload (_type_, optional): _description_. Defaults to None.
+            a (string): recv, send
+            payload (string, optional): message contenent. Defaults to None.
         """
         # Start the connection
         if a == 'recv':
@@ -69,10 +69,9 @@ class websocket_client():
             self.payload = payload
             asyncio.get_event_loop().run_until_complete(self.__send(flag=False))  
         else:
-            logging.info('Action wrong')  
+            logging.info('Action inserted wrong (websocket)')  
         
-    async def __send(self, flag): # flag serve se si vuole lasciare il client in attesa di un feedback tipo handshake
-        # Connect to the server
+    async def __send(self, flag):
         async with websockets.connect(self.url) as ws:
             await ws.send(message)
             msg = ''
@@ -82,7 +81,7 @@ class websocket_client():
                     logging.info(msg)
                     flag = False
 
-    async def __recv(self, flag, payload): # flag server se si vuole far inviare un message tipo handshke
+    async def __recv(self, flag, payload):
         async with websockets.connect(self.url) as ws:
             f = True
             msg = ''

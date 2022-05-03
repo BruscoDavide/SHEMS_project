@@ -1,7 +1,7 @@
 import paho.mqtt.client as PahoMQTT
 import time
 import json
-from mymqtt import MyMQTT
+from MyMQTT import MyMQTT
         
 class Prosumer:
     def __init__(self, energy, price, name):

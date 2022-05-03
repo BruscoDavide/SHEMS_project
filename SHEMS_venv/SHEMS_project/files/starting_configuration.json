@@ -9,9 +9,12 @@
     "home_city":"Turin",
     "country_code":380,
     "API_KEY":"165605b60d026027b1e5d38b89469113",
-    "BASE_URL1":"http://api.openweathermap.org/geo/1.0/direct?",
     "BASE_URL2": "https://api.openweathermap.org/data/2.5/forecast?",
     "time_granularity":15,
     "websocket_port": 7890,
-    "websocket_host": "localhost"
+    "websocket_host": "localhost",
+    "command_path":"./files/GUI_thread_commands.json",
+    "data_path":"./files/GUI_thread_data.json",
+    "webServer_command_path": "C:\\Users\\davide.brusco\\Documents\\Coding\\SHEMS\\SHEMS_project\\SHEMS_venv\\shems_project\\files\\GUI_thread_commands.json",
+    "webServer_data_path": "C:\\Users\\davide.brusco\\Documents\\Coding\\SHEMS\\SHEMS_project\\SHEMS_venv\\shems_project\\files\\GUI_thread_data.json"
 }

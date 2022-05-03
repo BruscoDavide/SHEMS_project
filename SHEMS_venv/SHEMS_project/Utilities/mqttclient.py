@@ -14,16 +14,20 @@ class MQTTPublisher():
         # create an instance of paho.mqtt.client 
         self._paho_mqtt = PahoMQTT.Client(self._clientID, False) 
         # register the callbacks
-        self._paho_mqtt.on_connect = self.myOnConnect
+        self._paho_mqtt.on_connect = self.__myOnConnect
 
-    def myOnConnect (self, paho_mqtt, userdata, flags, rc): 
+    def __myOnConnect (self, paho_mqtt, userdata, flags, rc): 
         logging.info(f'Connected to {self.broker} with result code {rc}') 
 
     def start(self):
+        """Start the MQTT publisher
+        """
         self._paho_mqtt.connect(self.broker, self.port) 
         self._paho_mqtt.loop_start() 
 
-    def stop (self): 
+    def stop(self): 
+        """Stop the MQTT publisher
+        """
         self._paho_mqtt.loop_stop() 
         self._paho_mqtt.disconnect()
 
@@ -73,6 +77,8 @@ class MQTTSubscriber():
         self.__callback = callback
 
     def start(self): #manage connection to broker 
+        """Start the MQTT subscriber
+        """
         self._paho_mqtt.connect(self.broker , self.port) 
         self._paho_mqtt.loop_start() 
 
@@ -87,6 +93,8 @@ class MQTTSubscriber():
         self._paho_mqtt.subscribe(topic, 0) 
 
     def stop (self): 
+        """Stop the MQTT subscriber
+        """
         self._paho_mqtt.unsubscribe(self._topic)  
         self._paho_mqtt.loop_stop() 
         self._paho_mqtt.disconnect()

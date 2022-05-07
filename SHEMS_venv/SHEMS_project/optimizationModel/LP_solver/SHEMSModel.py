@@ -52,7 +52,15 @@ class SHEMS():
     def get_new_instance(self, instance):
         self.instance = instance
         #when data are changed, the new data have to be retrieved from the server, or they will have to be read from the file
-        
+    
+    def set_status_day_before(self):
+        #TODO: write on server the data to update the instance
+        #Cosi' non va bene
+        self.Tset_off = self.Tin_out[-1]
+        self.Tset_off_wat = self.Tewh_out[-1]
+        self.Cess_day_before = self.Cess[-1]
+        self.Cpev_day_before = self.Cpev[-1]
+
     def set_working_mode(self, payload):
         """
         LEGEND:
@@ -748,23 +756,21 @@ class SHEMS():
 
     def battery_schedule(self, start_point = 0):
         remaining_minutes = 1440 - start_point*15
-        if self.vehicle_at_home == 1:
+        if self.instance.ess_ownership == 1 and self.vehicle_at_home == 1:
             n = self.charging_cycles_comp(start_point)
         else:
             n = None
         self.Cess[start_point+1:] = 0 #then the system needs a function that gets the power levels
         self.Pess[start_point+1:] = 0 #to check the total level of the battery during the day
         self.Pess_ch[start_point+1:] = 0 #to check the delta charge/discharge over the day
-        #########################################
-        Cess_day_before = 0 #NEED FUNCTION
-        ########################################
+        Cess_day_before = self.instance.Cess_day_before 
+        
 
         self.Cpev[start_point+1:] = 0
         self.Ppev[start_point+1:] = 0 #to check the total level of the battery during the day
         self.Ppev_ch[start_point+1:] = 0 #to check the delta charge/discharge over the day
-        #########################################
-        Cpev_day_before = 0 #NEED FUNCTION
-        ########################################
+        Cpev_day_before = self.instance.Cpev_day_before
+        
 
         self.Pess_chable[start_point+1:] = 0 
         self.Pess_disable[start_point+1:] = 0
@@ -774,135 +780,218 @@ class SHEMS():
         self.Pg_market[start_point+1:] = 0
 
         self.delta_t = 60/self.instance.time_granularity #in the first case it is delta_t = 0.25h
+        if self.instance.ess_ownership == 1:
+            for i in range(int(remaining_minutes/self.instance.time_granularity)):
+                self.Pg_market[start_point + i] = self.Pg_out[start_point + i]
+                
 
-        for i in range(int(remaining_minutes/self.instance.time_granularity)):
-            #STEP 1: COMPUTE THE AVAILABLE ENERGY TO BE CHARGED AND DISCHARGED
-            #
-            if i == 0 and start_point == 0:
-                """
-                NOTA: the capacity is expressed in kWh, but in our case the time_granularity is in minutes, 15 minutes slots.
-                So when doing the computations we need to pay attention how we compute the Chable.
-                We do the subtraction between upper limit and actual capacity and we obtain something which is kWh. To transform it in power we need to divide it
-                by the time duration so we remain with Watts. The time granularity is in minutes, so we have to transform it in minutes => kWh = 60kWmin, kWmin = kWh/60
-                Our time slot has a length of 15 minutes, so we have to multiply by 15, so the final capacity becomes expressed in function of the time slots => kW15min = kWh*15/60 = kWh/4
-                This is only the capacity, so now we can derive the Watts => P = C/time_slot
-                Now the measures are compatible and we obtain the amount of power that we can load into the battery in that time slot.
-                Remember then to divide by the charging inefficiency to obtain the real power needed to inject.
-                """
-                self.Pess_chable[start_point + i] = ( (self.instance.Cess_thresh_high*self.instance.Cess_max - Cess_day_before) / self.instance.charge_eff_ESS ) #/ self.delta_t # avail_Capacity/60*15 [kWmin * min]
-                if Cess_day_before <= 0:
-                    self.Pess_disable[start_point + i] = 0
-                else:
-                    tmp = (Cess_day_before - self.instance.Cess_thresh_low*self.instance.Cess_max)
-                    if tmp < 0: #if the energy available is lower than the lower bound, than the battery can't be discharged
+        elif self.instance.ess_ownership == 1:
+            for i in range(int(remaining_minutes/self.instance.time_granularity)):
+                #STEP 1: COMPUTE THE AVAILABLE ENERGY TO BE CHARGED AND DISCHARGED
+                #
+                if i == 0 and start_point == 0:
+                    """
+                    NOTA: the capacity is expressed in kWh, but in our case the time_granularity is in minutes, 15 minutes slots.
+                    So when doing the computations we need to pay attention how we compute the Chable.
+                    We do the subtraction between upper limit and actual capacity and we obtain something which is kWh. To transform it in power we need to divide it
+                    by the time duration so we remain with Watts. The time granularity is in minutes, so we have to transform it in minutes => kWh = 60kWmin, kWmin = kWh/60
+                    Our time slot has a length of 15 minutes, so we have to multiply by 15, so the final capacity becomes expressed in function of the time slots => kW15min = kWh*15/60 = kWh/4
+                    This is only the capacity, so now we can derive the Watts => P = C/time_slot
+                    Now the measures are compatible and we obtain the amount of power that we can load into the battery in that time slot.
+                    Remember then to divide by the charging inefficiency to obtain the real power needed to inject.
+                    """
+                    self.Pess_chable[start_point + i] = ( (self.instance.Cess_thresh_high*self.instance.Cess_max - Cess_day_before) / self.instance.charge_eff_ESS ) #/ self.delta_t # avail_Capacity/60*15 [kWmin * min]
+                    if Cess_day_before <= 0:
                         self.Pess_disable[start_point + i] = 0
                     else:
-                        self.Pess_disable[start_point + i] = ( (Cess_day_before - self.instance.Cess_thresh_low*self.instance.Cess_max) * self.instance.disch_eff_ESS ) / self.delta_t
-            else: 
-                self.Pess_chable[start_point + i] = ( (self.instance.Cess_thresh_high*self.instance.Cess_max - self.Cess[start_point + i-1]) / self.instance.charge_eff_ESS ) #/ self.delta_t
-                if self.Cess[start_point + i-1] <= 0:
-                    self.Pess_disable[start_point + i] = 0
-                else:
-                    tmp = (self.Cess[start_point + i -1] - self.instance.Cess_thresh_low*self.instance.Cess_max) 
-                    if tmp < 0: #if the energy available is lower than the lower bound, than the battery can't be discharged
-                        self.Pess_disable[start_point + i] = 0 
+                        tmp = (Cess_day_before - self.instance.Cess_thresh_low*self.instance.Cess_max)
+                        if tmp < 0: #if the energy available is lower than the lower bound, than the battery can't be discharged
+                            self.Pess_disable[start_point + i] = 0
+                        else:
+                            self.Pess_disable[start_point + i] = ( (Cess_day_before - self.instance.Cess_thresh_low*self.instance.Cess_max) * self.instance.disch_eff_ESS ) / self.delta_t
+                else: 
+                    self.Pess_chable[start_point + i] = ( (self.instance.Cess_thresh_high*self.instance.Cess_max - self.Cess[start_point + i-1]) / self.instance.charge_eff_ESS ) #/ self.delta_t
+                    if self.Cess[start_point + i-1] <= 0:
+                        self.Pess_disable[start_point + i] = 0
                     else:
-                        self.Pess_disable[start_point + i] = ( (self.Cess[start_point + i -1] - self.instance.Cess_thresh_low*self.instance.Cess_max) * self.instance.disch_eff_ESS ) #/ self.delta_t
-            #STEP 2: CHARGE/DISCHARGE THE BATTERIES
-            #
-            #
-            # 2a: VEHICLE NOT AT HOME 
-            if self.vehicle_at_home == 0: 
-                P1 = self.Pg_out[start_point + i]
-                if P1 < 0: #energy surplus 
-                    #charge the battery with the extra power
-                    extra_power = self.charge_ESS(abs(P1), start_point + i)
+                        tmp = (self.Cess[start_point + i -1] - self.instance.Cess_thresh_low*self.instance.Cess_max) 
+                        if tmp < 0: #if the energy available is lower than the lower bound, than the battery can't be discharged
+                            self.Pess_disable[start_point + i] = 0 
+                        else:
+                            self.Pess_disable[start_point + i] = ( (self.Cess[start_point + i -1] - self.instance.Cess_thresh_low*self.instance.Cess_max) * self.instance.disch_eff_ESS ) #/ self.delta_t
+                #STEP 2: CHARGE/DISCHARGE THE BATTERIES
+                #
+                #
+                # 2a: VEHICLE NOT AT HOME 
+                if self.vehicle_at_home == 0: 
+                    P1 = self.Pg_out[start_point + i]
+                    if P1 < 0: #energy surplus 
+                        #charge the battery with the extra power
+                        extra_power = self.charge_ESS(abs(P1), start_point + i)
 
-                    ##############################
-                    # SELL THE ENERGY ON THE MARKET
-                    ##############################
-                    self.Pg_market[start_point + i] = -extra_power #energy given, so it's negative
+                        ##############################
+                        # SELL THE ENERGY ON THE MARKET
+                        ##############################
+                        self.Pg_market[start_point + i] = -extra_power #energy given, so it's negative
 
-                elif P1 > 0: #energy required for the home
-                    #provide the energy from the battery or from the utility
-                    if self.instance.RTP[start_point + i] < self.instance.RTPess_dis: #electricity is convenient to be bought
-                        ###########################################
-                        #NOTA: here pay attention, if i = 0 we have to insert the last data of the day before
-                        ##########################################
-                        self.Pess[start_point + i] = self.Pess[start_point + i-1]
-                        self.Cess[start_point + i] = self.Cess[start_point + i-1]
-                        self.Pg_market[start_point + i] = P1 #record the energy bougth from the energy market
-                        #if the price is low enough, buy some energy also for the battery:
-                        if self.instance.RTP[start_point + i] < 0.09 and self.Pess_chable[start_point + i] != 0:
-                            self.Pg_market[start_point + i] += self.Pess_chable[start_point + i]
-                            self.charge_ESS(self.Pess_chable[start_point + i], start_point + i)
-                        
-                    elif self.instance.RTP[start_point + i] > self.instance.RTPess_dis: #electricity market is not that cheap, try with the ESS
-                        if self.Pess_disable[start_point + i] > P1: #check if ESS has enough energy
-                            self.discharge_ESS(P1,start_point + i)
-                        else: #if not enough energy, just buy it
+                    elif P1 > 0: #energy required for the home
+                        #provide the energy from the battery or from the utility
+                        if self.instance.RTP[start_point + i] < self.instance.RTPess_dis: #electricity is convenient to be bought
+                            ###########################################
+                            #NOTA: here pay attention, if i = 0 we have to insert the last data of the day before
+                            ##########################################
                             self.Pess[start_point + i] = self.Pess[start_point + i-1]
                             self.Cess[start_point + i] = self.Cess[start_point + i-1]
                             self.Pg_market[start_point + i] = P1 #record the energy bougth from the energy market
+                            #if the price is low enough, buy some energy also for the battery:
+                            if self.instance.RTP[start_point + i] < 0.09 and self.Pess_chable[start_point + i] != 0:
+                                self.Pg_market[start_point + i] += self.Pess_chable[start_point + i]
+                                self.charge_ESS(self.Pess_chable[start_point + i], start_point + i)
+                            
+                        elif self.instance.RTP[start_point + i] > self.instance.RTPess_dis: #electricity market is not that cheap, try with the ESS
+                            if self.Pess_disable[start_point + i] > P1: #check if ESS has enough energy
+                                self.discharge_ESS(P1,start_point + i)
+                            else: #if not enough energy, just buy it
+                                self.Pess[start_point + i] = self.Pess[start_point + i-1]
+                                self.Cess[start_point + i] = self.Cess[start_point + i-1]
+                                self.Pg_market[start_point + i] = P1 #record the energy bougth from the energy market
 
-            #
-            #
-            # 2b: VEHICLE AT HOME
-            elif self.vehicle_at_home == 1: 
-                if i == 0 and start_point == 0:
-                    self.Ppev_chable[start_point + i] = ( (self.instance.Cpev_thresh_high*self.instance.Cpev_max - Cpev_day_before) / self.instance.charge_eff_PEV ) #/ self.delta_t # avail_Capacity/60*15 [kWmin * min]
-                    if Cpev_day_before <= 0:
-                        self.Ppev_disable[start_point + i] = 0
-                    else:
-                        tmp = (Cpev_day_before - self.instance.Cpev_thresh_low*self.instance.Cpev_max)
-                        if tmp < 0: #if the energy available is lower than the lower bound, than the battery can't be discharged
+                #
+                #
+                # 2b: VEHICLE AT HOME
+                elif self.instance.car_ownership == 1 and self.vehicle_at_home == 1: 
+                    if i == 0 and start_point == 0:
+                        self.Ppev_chable[start_point + i] = ( (self.instance.Cpev_thresh_high*self.instance.Cpev_max - Cpev_day_before) / self.instance.charge_eff_PEV ) #/ self.delta_t # avail_Capacity/60*15 [kWmin * min]
+                        if Cpev_day_before <= 0:
                             self.Ppev_disable[start_point + i] = 0
                         else:
-                            self.Ppev_disable[start_point + i] = ( (Cpev_day_before - self.instance.Cpev_thresh_low*self.instance.Cpev_max) * self.instance.disch_eff_PEV ) / self.delta_t
-                else: 
-                    self.Ppev_chable[start_point + i] = ( (self.instance.Cpev_thresh_high*self.instance.Cpev_max - self.Cpev[start_point + i-1]) / self.instance.charge_eff_PEV ) #/ self.delta_t
-                    if self.Cpev[start_point + i-1] <= 0:
-                        self.Ppev_disable[start_point + i] = 0
-                    else:
-                        tmp = (self.Cpev[start_point + i -1] - self.instance.Cpev_thresh_low*self.instance.Cpev_max) 
-                        if tmp < 0: #if the energy available is lower than the lower bound, than the battery can't be discharged
-                            self.Ppev_disable[start_point + i] = 0 
+                            tmp = (Cpev_day_before - self.instance.Cpev_thresh_low*self.instance.Cpev_max)
+                            if tmp < 0: #if the energy available is lower than the lower bound, than the battery can't be discharged
+                                self.Ppev_disable[start_point + i] = 0
+                            else:
+                                self.Ppev_disable[start_point + i] = ( (Cpev_day_before - self.instance.Cpev_thresh_low*self.instance.Cpev_max) * self.instance.disch_eff_PEV ) / self.delta_t
+                    else: 
+                        self.Ppev_chable[start_point + i] = ( (self.instance.Cpev_thresh_high*self.instance.Cpev_max - self.Cpev[start_point + i-1]) / self.instance.charge_eff_PEV ) #/ self.delta_t
+                        if self.Cpev[start_point + i-1] <= 0:
+                            self.Ppev_disable[start_point + i] = 0
                         else:
-                            self.Ppev_disable[start_point + i] = ( (self.Cpev[start_point + i -1] - self.instance.Cpev_thresh_low*self.instance.Cpev_max) * self.instance.disch_eff_PEV ) #/ self.delta_t
-                #
-                #
-                # 2b-1: VEHICLE AT HOME AND CAN BE USED
-                if start_point + i <= n: 
-                    P1 = self.Pg_out[start_point + i]
-                    if P1 > 0: #it means that the renewable is not enough, ask someone
-                        if self.instance.RTP[start_point + i] < self.instance.RTPess_dis and self.instance.RTP[start_point + i] < self.instance.RTPpev_dis: #electricity is convenient to be bought
-                           ###########################################
-                           #NOTA: here pay attention, if i = 0 we have to insert the last data of the day before
-                           ##########################################
-                           self.Pess[start_point + i] = self.Pess[start_point + i-1]
-                           self.Cess[start_point + i] = self.Cess[start_point + i-1]
-                           self.Ppev[start_point + i] = self.Ppev[start_point + i-1]
-                           self.Cpev[start_point + i] = self.Cpev[start_point + i-1]
-                           self.Pg_market[start_point + i] = P1 #record the energy bougth from the energy market
-
-                        elif self.instance.RTP[start_point + i] < self.instance.RTPess_dis and self.instance.RTP[start_point + i] > self.instance.RTPpev_dis: #electricity market is not that cheap, try with the ESS or PEV
-                            if self.Ppev_disable[start_point + i] > P1:
-                                self.discharge_PEV(P1, start_point + i)
+                            tmp = (self.Cpev[start_point + i -1] - self.instance.Cpev_thresh_low*self.instance.Cpev_max) 
+                            if tmp < 0: #if the energy available is lower than the lower bound, than the battery can't be discharged
+                                self.Ppev_disable[start_point + i] = 0 
+                            else:
+                                self.Ppev_disable[start_point + i] = ( (self.Cpev[start_point + i -1] - self.instance.Cpev_thresh_low*self.instance.Cpev_max) * self.instance.disch_eff_PEV ) #/ self.delta_t
+                    #
+                    #
+                    # 2b-1: VEHICLE AT HOME AND CAN BE USED
+                    if start_point + i <= n: 
+                        P1 = self.Pg_out[start_point + i]
+                        if P1 > 0: #it means that the renewable is not enough, ask someone
+                            if self.instance.RTP[start_point + i] < self.instance.RTPess_dis and self.instance.RTP[start_point + i] < self.instance.RTPpev_dis: #electricity is convenient to be bought
+                            ###########################################
+                            #NOTA: here pay attention, if i = 0 we have to insert the last data of the day before
+                            ##########################################
                                 self.Pess[start_point + i] = self.Pess[start_point + i-1]
                                 self.Cess[start_point + i] = self.Cess[start_point + i-1]
-                            elif self.Ppev_disable[start_point + i] < P1: #if no enough energy, be conservative and buy from the market
                                 self.Ppev[start_point + i] = self.Ppev[start_point + i-1]
                                 self.Cpev[start_point + i] = self.Cpev[start_point + i-1]
-                                self.Pess[start_point + i] = self.Pess[start_point + i-1]
-                                self.Cess[start_point + i] = self.Cess[start_point + i-1]
-                                self.Pg_market[start_point + i] = P1
+                                self.Pg_market[start_point + i] = P1 #record the energy bougth from the energy market
 
-                        elif self.instance.RTP[start_point + i] > self.instance.RTPess_dis and self.instance.RTP[start_point + i] < self.instance.RTPpev_dis:
-                            if self.Pess_disable[start_point + i] > P1:
-                                self.discharge_ESS(P1,start_point + i)
-                                self.Ppev[start_point + i] = self.Ppev[start_point + i-1]
-                                self.Cpev[start_point + i] = self.Cpev[start_point + i-1]
-                            elif self.Pess_disable[start_point + i] < P1:
+                            elif self.instance.RTP[start_point + i] < self.instance.RTPess_dis and self.instance.RTP[start_point + i] > self.instance.RTPpev_dis: #electricity market is not that cheap, try with the ESS or PEV
+                                if self.Ppev_disable[start_point + i] > P1:
+                                    self.discharge_PEV(P1, start_point + i)
+                                    self.Pess[start_point + i] = self.Pess[start_point + i-1]
+                                    self.Cess[start_point + i] = self.Cess[start_point + i-1]
+                                elif self.Ppev_disable[start_point + i] < P1: #if no enough energy, be conservative and buy from the market
+                                    self.Ppev[start_point + i] = self.Ppev[start_point + i-1]
+                                    self.Cpev[start_point + i] = self.Cpev[start_point + i-1]
+                                    self.Pess[start_point + i] = self.Pess[start_point + i-1]
+                                    self.Cess[start_point + i] = self.Cess[start_point + i-1]
+                                    self.Pg_market[start_point + i] = P1
+
+                            elif self.instance.RTP[start_point + i] > self.instance.RTPess_dis and self.instance.RTP[start_point + i] < self.instance.RTPpev_dis:
+                                if self.Pess_disable[start_point + i] > P1:
+                                    self.discharge_ESS(P1,start_point + i)
+                                    self.Ppev[start_point + i] = self.Ppev[start_point + i-1]
+                                    self.Cpev[start_point + i] = self.Cpev[start_point + i-1]
+                                elif self.Pess_disable[start_point + i] < P1:
+                                    ###########################################
+                                    #NOTA: here pay attention, if i = 0 we have to insert the last data of the day before
+                                    ##########################################
+                                    self.Pess[start_point + i] = self.Pess[start_point + i-1]
+                                    self.Cess[start_point + i] = self.Cess[start_point + i-1]
+                                    self.Ppev[start_point + i] = self.Ppev[start_point + i-1]
+                                    self.Cpev[start_point + i] = self.Cpev[start_point + i-1]
+
+                                    self.Pg_market[start_point + i] = P1
+                            elif self.instance.RTP[start_point + i] > self.instance.RTPess_dis and self.instance.RTP[start_point + i] > self.instance.RTPpev_dis:
+                                #if RTP is higher than both discharging prices, we evaluate which device has more power to be discharged
+                                #if ESS has more power, discharge that on
+                                if self.Pess_disable[start_point + i] > self.Ppev_disable[start_point + i] and P1 < self.Pess_disable[start_point + i]:
+                                    self.discharge_ESS(P1,start_point + i)
+                                    self.Ppev[start_point + i] = self.Ppev[start_point + i-1]
+                                    self.Cpev[start_point + i] = self.Cpev[start_point + i-1]
+                                #if PEV has more power, discharge that
+                                elif self.Ppev_disable[start_point + i] > self.Pess_disable[start_point + i] and P1 < self.Ppev_disable[start_point + i]:
+                                    self.discharge_PEV(P1,start_point + i)
+                                    self.Pess[start_point + i] = self.Pess[start_point + i-1]
+                                    self.Cess[start_point + i] = self.Cess[start_point + i-1]
+                                #if P1 is bigger than the single batteries capacities, but it is smaller than their total capacity
+                                elif P1 > self.Pess_disable[start_point + i] and P1 > self.Ppev_disable[start_point + i] and P1 < self.Pess_disable[start_point + i] + self.Ppev_disable[start_point + i]:
+                                    #different strategies can be applied:
+                                    #1) if both batteries can be discharged, split the quantity
+                                    #2) if previous cannot be applied, then take what you can form one and the remaining part from the other one
+                                    if self.Pess_disable[start_point + i] > P1/2 and self.Ppev_disable[start_point + i] > P1/2:
+                                        self.discharge_ESS(P1/2, start_point + i)
+                                        self.discharge_PEV(P1/2, start_point + i)
+                                    elif self.Pess_disable[start_point + i] > P1/2 and self.Ppev_disable[start_point + i] < P1/2: #PEV is the one with less power
+                                        self.discharge_ESS(P1 - self.Ppev_disable[start_point + i], start_point + i)
+                                        self.discharge_PEV(self.Ppev_disable[start_point + i], start_point + i)
+                                    elif self.Pess_disable[start_point + i] < P1/2 and self.Ppev_disable[start_point + i] > P1/2: #ESS is the one with less power
+                                        self.discharge_ESS(self.Pess_disable[start_point + i], start_point + i)
+                                        self.discharge_PEV(P1 - self.Pess_disable[start_point + i], start_point + i)
+
+                                #if P1 is bigger than the combination of both ESS and PEV, use what you can and then buy it from the market
+                                elif P1 > self.Pess_disable[start_point + i] + self.Ppev_disable[start_point + i]:
+                                    self.discharge_ESS(self.Pess_disable[start_point + i], start_point + i)
+                                    self.discharge_PEV(self.Ppev_disable[start_point + i], start_point + i)
+                                    self.Pg_market[start_point + i] = P1 - ( self.Pess_disable[start_point + i] + self.Ppev_disable[start_point + i] ) 
+                                else:
+                                    print("something went wrong with the RTPs in iteration ", start_point + i)
+
+
+                        elif P1 < 0: #energy surplus, load the battery
+                            avail_power = abs(P1) #power available for the battery charge
+                            extra_power = self.charge_PEV(avail_power, start_point + i)
+                            self.Pess[start_point + i] = self.Pess[start_point + i-1]
+                            self.Cess[start_point + i] = self.Cess[start_point + i-1]
+                            if extra_power > 0:
+                                extra_power = self.charge_ESS(extra_power, start_point + i)
+                                if extra_power > 0:
+                                    self.Pg_market[start_point + i] = -extra_power
+                        else:
+                            print("something went wrong in section VEHICLE AT HOME, I<n")
+                    #
+                    #
+                    # 2b-2: VEHICLE AT HOME AND CANNOT BE USED, ONLY CHARGE
+                    elif start_point + i > n and start_point + i < self.instance.time_dep: #VEHICLE CAN'T BE USED ANYMORE FOR DISCHARGING
+                        P1 = self.Pg_out[start_point + i]
+                        if P1 < 0: #energy surplus 
+                            avail_power = abs(P1)
+                            extra_power = self.charge_PEV(avail_power, start_point + i)
+                            self.Pess[start_point + i] = self.Pess[start_point + i-1]
+                            self.Cess[start_point + i] = self.Cess[start_point + i-1]
+                            #then charge the battery with the remaining power
+                            if extra_power > 0:
+                                extra_power = self.charge_ESS(extra_power, start_point + i)
+                                ################################
+                                # sell the remaining part of energy
+                                ################################
+                                if extra_power > 0:
+                                    self.Pg_market[start_point + i] = -extra_power
+
+                        elif P1 > 0: #energy required for the home
+                            #PROVIDE THE ENERGY TO THE HOME 
+                            if self.instance.RTP[start_point + i] < self.instance.RTPess_dis: #electricity is convenient to be bought
                                 ###########################################
                                 #NOTA: here pay attention, if i = 0 we have to insert the last data of the day before
                                 ##########################################
@@ -910,117 +999,39 @@ class SHEMS():
                                 self.Cess[start_point + i] = self.Cess[start_point + i-1]
                                 self.Ppev[start_point + i] = self.Ppev[start_point + i-1]
                                 self.Cpev[start_point + i] = self.Cpev[start_point + i-1]
+                                self.Pg_market[start_point + i] = P1 #record the energy bougth from the energy market
 
-                                self.Pg_market[start_point + i] = P1
-                        elif self.instance.RTP[start_point + i] > self.instance.RTPess_dis and self.instance.RTP[start_point + i] > self.instance.RTPpev_dis:
-                            #if RTP is higher than both discharging prices, we evaluate which device has more power to be discharged
-                            #if ESS has more power, discharge that on
-                            if self.Pess_disable[start_point + i] > self.Ppev_disable[start_point + i] and P1 < self.Pess_disable[start_point + i]:
-                                self.discharge_ESS(P1,start_point + i)
-                                self.Ppev[start_point + i] = self.Ppev[start_point + i-1]
-                                self.Cpev[start_point + i] = self.Cpev[start_point + i-1]
-                            #if PEV has more power, discharge that
-                            elif self.Ppev_disable[start_point + i] > self.Pess_disable[start_point + i] and P1 < self.Ppev_disable[start_point + i]:
-                                self.discharge_PEV(P1,start_point + i)
-                                self.Pess[start_point + i] = self.Pess[start_point + i-1]
-                                self.Cess[start_point + i] = self.Cess[start_point + i-1]
-                            #if P1 is bigger than the single batteries capacities, but it is smaller than their total capacity
-                            elif P1 > self.Pess_disable[start_point + i] and P1 > self.Ppev_disable[start_point + i] and P1 < self.Pess_disable[start_point + i] + self.Ppev_disable[start_point + i]:
-                                #different strategies can be applied:
-                                #1) if both batteries can be discharged, split the quantity
-                                #2) if previous cannot be applied, then take what you can form one and the remaining part from the other one
-                                if self.Pess_disable[start_point + i] > P1/2 and self.Ppev_disable[start_point + i] > P1/2:
-                                    self.discharge_ESS(P1/2, start_point + i)
-                                    self.discharge_PEV(P1/2, start_point + i)
-                                elif self.Pess_disable[start_point + i] > P1/2 and self.Ppev_disable[start_point + i] < P1/2: #PEV is the one with less power
-                                    self.discharge_ESS(P1 - self.Ppev_disable[start_point + i], start_point + i)
-                                    self.discharge_PEV(self.Ppev_disable[start_point + i], start_point + i)
-                                elif self.Pess_disable[start_point + i] < P1/2 and self.Ppev_disable[start_point + i] > P1/2: #ESS is the one with less power
-                                    self.discharge_ESS(self.Pess_disable[start_point + i], start_point + i)
-                                    self.discharge_PEV(P1 - self.Pess_disable[start_point + i], start_point + i)
+                                #check if you can charge the car in this slot 
+                                if self.instance.RTP[start_point + i] < np.mean(self.instance.RTP[start_point:self.instance.time_dep + 1]):
+                                    #buy electricity also for the car
+                                    self.Pg_market[start_point + i] += min(self.Ppev_chable[start_point + i], self.instance.Pdr - self.Pg_market[start_point + i], self.instance.Ppev_chmax) 
+                                                                        #if available, buy all the Ppev_chable, otherwise buy only what's possible
+                                    self.charge_PEV( min(self.Ppev_chable[start_point + i], self.instance.Pdr - self.Pg_market[start_point + i], self.instance.Ppev_chmax) , start_point + i)
 
-                            #if P1 is bigger than the combination of both ESS and PEV, use what you can and then buy it from the market
-                            elif P1 > self.Pess_disable[start_point + i] + self.Ppev_disable[start_point + i]:
-                                self.discharge_ESS(self.Pess_disable[start_point + i], start_point + i)
-                                self.discharge_PEV(self.Ppev_disable[start_point + i], start_point + i)
-                                self.Pg_market[start_point + i] = P1 - ( self.Pess_disable[start_point + i] + self.Ppev_disable[start_point + i] ) 
-                            else:
-                                print("something went wrong with the RTPs in iteration ", start_point + i)
+                            elif self.instance.RTP[start_point + i] > self.instance.RTPess_dis: #electricity market is not that cheap, try with the ESS or PEV
+                                if self.Pess_disable[start_point + i] > P1: #check if ESS has enough energy
+                                    self.discharge_ESS(P1, start_point + i)
+                                    self.Ppev[start_point + i] = self.Pess[start_point + i-1]
+                                    self.Cpev[start_point + i] = self.Cpev[start_point + i-1]
+                                elif self.Pess_disable[start_point + i] < P1:
+                                    self.Pess[start_point + i] = self.Pess[start_point + i-1]
+                                    self.Cess[start_point + i] = self.Cess[start_point + i-1]
+                                    self.Ppev[start_point + i] = self.Ppev[start_point + i-1]
+                                    self.Cpev[start_point + i] = self.Cpev[start_point + i-1]
+                                    self.Pg_market[start_point + i] = P1
 
-
-                    elif P1 < 0: #energy surplus, load the battery
-                        avail_power = abs(P1) #power available for the battery charge
-                        extra_power = self.charge_PEV(avail_power, start_point + i)
+                                #check if you can charge the car in this slot    
+                                if self.instance.RTP[start_point + i] < np.mean(self.instance.RTP[start_point:self.instance.time_dep + 1]):
+                                    #buy electricity also for the car
+                                    self.Pg_market[start_point + i] += min(self.Ppev_chable[start_point + i], self.instance.Pdr - self.Pg_market[start_point + i], self.instance.Ppev_chmax) 
+                                                                        #if available, buy all the Ppev_chable, otherwise buy only what's possible
+                                    self.charge_PEV( min(self.Ppev_chable[start_point + i], self.instance.Pdr - self.Pg_market[start_point + i], self.instance.Ppev_chmax) , start_point + i)
+                    
+                    elif start_point + i >= self.instance.time_dep:
                         self.Pess[start_point + i] = self.Pess[start_point + i-1]
                         self.Cess[start_point + i] = self.Cess[start_point + i-1]
-                        if extra_power > 0:
-                            extra_power = self.charge_ESS(extra_power, start_point + i)
-                            if extra_power > 0:
-                                self.Pg_market[start_point + i] = -extra_power
-                    else:
-                        print("something went wrong in section VEHICLE AT HOME, I<n")
-                #
-                #
-                # 2b-2: VEHICLE AT HOME AND CANNOT BE USED, ONLY CHARGE
-                elif start_point + i > n and start_point + i < self.instance.time_dep: #VEHICLE CAN'T BE USED ANYMORE FOR DISCHARGING
-                    P1 = self.Pg_out[start_point + i]
-                    if P1 < 0: #energy surplus 
-                        avail_power = abs(P1)
-                        extra_power = self.charge_PEV(avail_power, start_point + i)
-                        self.Pess[start_point + i] = self.Pess[start_point + i-1]
-                        self.Cess[start_point + i] = self.Cess[start_point + i-1]
-                        #then charge the battery with the remaining power
-                        if extra_power > 0:
-                            extra_power = self.charge_ESS(extra_power, start_point + i)
-                            ################################
-                            # sell the remaining part of energy
-                            ################################
-                            if extra_power > 0:
-                                self.Pg_market[start_point + i] = -extra_power
-
-                    elif P1 > 0: #energy required for the home
-                        #PROVIDE THE ENERGY TO THE HOME 
-                        if self.instance.RTP[start_point + i] < self.instance.RTPess_dis: #electricity is convenient to be bought
-                            ###########################################
-                            #NOTA: here pay attention, if i = 0 we have to insert the last data of the day before
-                            ##########################################
-                            self.Pess[start_point + i] = self.Pess[start_point + i-1]
-                            self.Cess[start_point + i] = self.Cess[start_point + i-1]
-                            self.Ppev[start_point + i] = self.Ppev[start_point + i-1]
-                            self.Cpev[start_point + i] = self.Cpev[start_point + i-1]
-                            self.Pg_market[start_point + i] = P1 #record the energy bougth from the energy market
-
-                            #check if you can charge the car in this slot 
-                            if self.instance.RTP[start_point + i] < np.mean(self.instance.RTP[start_point:self.instance.time_dep + 1]):
-                                #buy electricity also for the car
-                                self.Pg_market[start_point + i] += min(self.Ppev_chable[start_point + i], self.instance.Pdr - self.Pg_market[start_point + i], self.instance.Ppev_chmax) 
-                                                                    #if available, buy all the Ppev_chable, otherwise buy only what's possible
-                                self.charge_PEV( min(self.Ppev_chable[start_point + i], self.instance.Pdr - self.Pg_market[start_point + i], self.instance.Ppev_chmax) , start_point + i)
-
-                        elif self.instance.RTP[start_point + i] > self.instance.RTPess_dis: #electricity market is not that cheap, try with the ESS or PEV
-                            if self.Pess_disable[start_point + i] > P1: #check if ESS has enough energy
-                                self.discharge_ESS(P1, start_point + i)
-                                self.Ppev[start_point + i] = self.Pess[start_point + i-1]
-                                self.Cpev[start_point + i] = self.Cpev[start_point + i-1]
-                            elif self.Pess_disable[start_point + i] < P1:
-                                self.Pess[start_point + i] = self.Pess[start_point + i-1]
-                                self.Cess[start_point + i] = self.Cess[start_point + i-1]
-                                self.Ppev[start_point + i] = self.Ppev[start_point + i-1]
-                                self.Cpev[start_point + i] = self.Cpev[start_point + i-1]
-                                self.Pg_market[start_point + i] = P1
-
-                            #check if you can charge the car in this slot    
-                            if self.instance.RTP[start_point + i] < np.mean(self.instance.RTP[start_point:self.instance.time_dep + 1]):
-                                #buy electricity also for the car
-                                self.Pg_market[start_point + i] += min(self.Ppev_chable[start_point + i], self.instance.Pdr - self.Pg_market[start_point + i], self.instance.Ppev_chmax) 
-                                                                    #if available, buy all the Ppev_chable, otherwise buy only what's possible
-                                self.charge_PEV( min(self.Ppev_chable[start_point + i], self.instance.Pdr - self.Pg_market[start_point + i], self.instance.Ppev_chmax) , start_point + i)
-                
-                elif start_point + i >= self.instance.time_dep:
-                    self.Pess[start_point + i] = self.Pess[start_point + i-1]
-                    self.Cess[start_point + i] = self.Cess[start_point + i-1]
-                    if self.vehicle_at_home == 1:
-                        self.vehicle_at_home = 0
+                        if self.vehicle_at_home == 1:
+                            self.vehicle_at_home = 0
 
     #Fucntion working: TODO eventually add a warning for all the situations where the user come home too late and the battery can't be fully charged
     def charging_cycles_comp(self, start_point):

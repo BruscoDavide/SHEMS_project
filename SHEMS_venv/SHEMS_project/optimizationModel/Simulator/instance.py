@@ -28,6 +28,8 @@ class Instance():
         self.Cp = 0 #CHECK WHAT THIS PARAMETER IS
 
         #BATTERY ENERGY SOURCES
+        self.car_ownership = 0
+        self.ess_ownership = 0
         self.disch_eff_ESS = 0 #ESS discharging efficiency
         self.disch_eff_PEV = 0 #PEV discharging efficiency
         self.charge_eff_ESS = 0 #ESS charging efficiency
@@ -45,6 +47,9 @@ class Instance():
         self.Cess_thresh_high = 0
         self.Cpev_thresh_low = 0
         self.Cpev_thresh_high = 0
+
+        self.Cess_day_before = 0
+        self.Cpev_day_before = 0
 
         #APPLIANCES
         self.N_sched_appliances = 0 #this number has to be defined so we can write variables like Nd and all the othersvariables
@@ -82,8 +87,8 @@ class Instance():
         self.Tin_min = data["Tin_min"] #min indoor temp
         self.Tewh_max = data["Tewh_max"] #max water temp
         self.Tewh_min = data["Tewh_min"] #min water temp
-        self.Tset_off = data["Tset_off"] #tipical temperature of that kind of house
-        self.Tset_off_wat = data["Tset_off_wat"] #tipical temperature of the water in the pipes of that kind of house
+        self.Tset_off = data["Tset_off"] #tipical temperature of that kind of house or the temperature of the house the day before
+        self.Tset_off_wat = data["Tset_off_wat"] #tipical temperature of the water in the pipes of that kind of house or the temperature of the house the day before
 
         data = self.databaseClient.read_documents(collection_name='home_configuration', document={'_id':1}) 
         data = data['outside_measure']
@@ -104,6 +109,8 @@ class Instance():
         #BATTERY ENERGY SOURCES
         data = self.databaseClient.read_documents(collection_name='home_configuration', document={'_id':3}) 
         data = data["batteries"]
+        self.car_ownership = data["car_ownership"] #TODO: add those two flags in the database
+        self.ess_ownership = data["ess_ownership"]
         self.disch_eff_ESS = data["disch_eff_ESS"] #ESS discharging efficiency
         self.disch_eff_PEV = data["disch_eff_PEV"] #PEV discharging efficiency
         self.charge_eff_ESS = data["charge_eff_ESS"] #ESS charging efficiency
@@ -124,6 +131,9 @@ class Instance():
 
         self.Cess_init = data["Cess_init"] #Save the battery status from one day to another
         self.Cpev_init = data["Cpev_init"] #Save the battery status at the arrival time
+
+        self.Cess_day_before = data["Cess_day_before "] #TODO: find the way to save them in the database for the next day schedule
+        self.Cpev_day_before = data["Cpev_day_before "]
 
         #APPLIANCES
         data = self.databaseClient.read_documents(collection_name='home_configuration', document={'_id':4}) 

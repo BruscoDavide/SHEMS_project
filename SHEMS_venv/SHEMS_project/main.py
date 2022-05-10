@@ -11,7 +11,7 @@ from mongoDB.database_client import databaseClient
 from optimizationModel.Simulator.instance import Instance
 from optimizationModel.LP_solver.SHEMSModel import SHEMS
 from prosumerCommunity.prosumerMarket import Prosumer
-from pushNotification_server.websocket import websocket_server
+from pushNotification_server.websocket import SHEMSwebsocket
 
 class SHEMS_main():
     def __init__(self, cfg):
@@ -22,7 +22,7 @@ class SHEMS_main():
             cfg (dict): configuration file
         """
         try:
-            self.__reset()
+            #self.__reset()
 
             self.time_granularity = cfg['time_granularity']
             self.commands_path = cfg['commands_path']
@@ -63,7 +63,7 @@ class SHEMS_main():
                 logging.error(f'Error weather API: {response.status_code}')
 
             # Push notification
-            self.pushnotification_server = websocket_server(cfg['websocket_port'], cfg['websocket_host'])
+            self.pushnotification_server = SHEMSwebsocket(cfg)
             # TODO:contronllo del messaggio, piccola encriptazione del messaggio (in più)
 
             logging.info('Environment generation done')
@@ -88,12 +88,12 @@ class SHEMS_main():
                 if code == 1: logging.info('Data updated')
                 else: logging.error('Database failed')
                 
-                self.pushnotification_server.action('send', 'First scheduling of the day had success')
+                self.pushnotification_server.upgradeNotification({'message':'First scheduling of the day had success'})
                 logging.info('First scheduling of the day had success')
             except:
                 logging.error('Local websocket server or database error')
         elif cod == -1:
-            self.pushnotification_server.action('send', 'First scheduling of the day failed')
+            self.pushnotification_server.upgradeNotification({'message':'First scheduling of the day failed'})
             logging.info('First scheduling of the day failed')
     
     def __weatherAPI(self):
@@ -204,18 +204,18 @@ class SHEMS_main():
             if cod == 2:
                 try:
                     self.historyData_saving(step)
-                    self.pushnotification_server.action('send', 'New schedling performed, hot water used')
+                    self.pushnotification_server.upgradeNotification({'message':'New schedling performed, hot water used'})
                     logging.info('New schedling performed, hot water used')
                 except:
                     logging.error('Local websocket server error')
             elif cod == -1:
-                self.pushnotification_server.action('send', 'New scheduling failed. Too much hot water used')
+                self.pushnotification_server.upgradeNotification({'message':'New scheduling failed. Too much hot water used'})
                 logging.warning('New scheduling failed. Too much hot water used')
 
         elif msg.topic == self.carStation_topic:
             if msg.payload == 1:
                 self.shems.set_car_arrival()
-                self.pushnotification_server.action('send', 'Electric vehicle in the garage')
+                self.pushnotification_server.upgradeNotification({'message':'Electric vehicle in the garage'})
             else: 
                 logging.error('Error in the carStation publisher')
 
@@ -1024,9 +1024,9 @@ if __name__ == '__main__':
     GUIcommands = perpetualTimer(t=5, hFunction=main.GUI_thread_callback)
     GUIcommands.start()
 
-    prosumer = Prosumer("shems")
-    prosumer_timer = perpetualTimer(t = 15*60, hFunction=prosumer.thread_callback)
-    prosumer_timer.start()
+    #prosumer = Prosumer("shems")
+    #prosumer_timer = perpetualTimer(t = 15*60, hFunction=prosumer.thread_callback)
+    #prosumer_timer.start()
 
     while True:
         pass

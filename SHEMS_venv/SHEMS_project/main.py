@@ -72,9 +72,14 @@ class SHEMS_main():
 
     def __basicScheduling_thread_callback(self):
         """First day scheduling, done at 8:00 a.m. 
-        """    
+        """ 
         self.__weatherAPI()
         
+        obj = self.databaseClient.read_documents(collection_name='home_configuration', document={'_id':0})
+        obj['home_setpoints']['Tin_out'] = self.shems.Tin_out[-1]
+        obj['home setpoints']['Tewh_out'] = self.shems.Tewh_out[-1]
+        self.databaseClient.update_documents(collection_name='home_configuration', document={'_id':0}, object=obj)
+
         self.instance.get_data_serv()
         self.shems.get_new_instance(self.instance)
         
@@ -784,42 +789,36 @@ class SHEMS_main():
                     try:
                         data = self.databaseClient.read_documents(collection_name='data_collected', document={'_id':'hisotry'})
                         requiredData = []
-                        tot_energy = 0
-                        tot_price = 0
-                        min_price = 999
-                        max_price = -999
-                        min_energy = 999
-                        max_energy = -999
-                        sum_energy = 0
-                        sum_price = 0
+                        tot_energy_sold = 0
+                        tot_energy_bought = 0
+                        tot_price_sold = 0
+                        tot_price_bought = 0
                         for i in data['prosumers']:
                             ob = {}
                             ob['name'] = i['name']
                             ob['interactions'] += 1
-                            for j in range(len(i['energies'])): 
-                                tot_energy += i['energies'][j]
-                                tot_price += i['energies'][j]*i['prices'][j]
-                                if i['energies'] > max_energy: max_energy = i['energies']
-                                if i['energies'] < min_energy: min_energy = i['energies']
-                                if i['prices'] > max_price: max_price = i['prices']
-                                if i['prices'] < min_price: min_price = i['prices']
-                            """
-                            tot_energy_sold
-                            tot_energy_bought
-                            mean_price_sold
-                            min_price_bought
-                           
-
-                            """
-                            ob['tot_energy'] = tot_energy
-                            ob['tot_price'] = tot_price
-                            ob['mean_price'] = sum_price/len(i['energies'])
-                            ob['min_price'] = min_price
-                            ob['max_price'] = max_price
-                            ob['mean_energy'] = sum_energy/len(i['energies'])
-                            ob['min_energy'] = min_energy
-                            ob['max_energy'] = max_energy
+                            for j in range(len(i['energies'])):
+                                if i['energies'][j] > 0: 
+                                    tot_energy_bought += i['energies'][j]
+                                    tot_price_bought += i['energies'][j]*i['prices'][j]
+                                else: # <0 
+                                    tot_energy_sold += abs(i['energies'][j])
+                                    tot_price_sold += abs(i['energies'][j]*i['prices'][j])
+                            ob['mean_price_bought'] = tot_price_bought/len(i['energies'])
+                            ob['mean_price_sold'] = tot_price_sold/len(i['energies'])
+                            ob['mean_energy_bought'] = tot_energy_bought/len(i['energies'])
+                            ob['mean_energy_sold'] = tot_energy_sold/len(i['energies'])
+                            ob['tot_price_bought'] = tot_price_bought
+                            ob['tot_price_sold'] = tot_price_sold
+                            ob['tot_energy_bought'] = tot_energy_bought
+                            ob['tot_energy_sold'] = tot_energy_sold
+                            # now data about the home owner
+                            ob['my_tot_energy_sold'] += tot_energy_sold
+                            ob['my_tot_energy_bought'] += tot_energy_bought
+                            ob['my_tot_price_sold'] += tot_price_sold
+                            ob['my_tot_price_bought'] += tot_price_bought
                             requiredData.append(ob)
+
 
                         self.append_data(code=timestamp, data=requiredData)
 

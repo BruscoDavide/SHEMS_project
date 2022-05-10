@@ -88,7 +88,7 @@ class Prosumer:
 
                     data = self.databaseClient.read_documents(collection_name='data_collected', document={'_id':'history'})
                     data['prosumers'].append(selling_record_tmp)
-                    self.databaseClient.update_documents(collection_name='home_configuration', document={'_id':0}, data=data)
+                    self.databaseClient.update_documents(collection_name='data_collected', document={'_id':'history'}, data=data)
                     
         except:
             print("invalid message format")

@@ -10,10 +10,11 @@ class SHEMSwebsocket():
         self.server.set_fn_client_left(self.__clientLeft)
         self.server.set_fn_message_received(self.__messageReceived)
         self.server.run_forever()
-        self.payload = {}
+        self.payload = []
 
     def __sendNotification(self):
         self.server.send_message_to_all(self.payload)
+        self.payload = []
 
     def __clientLeft(self):
         logging.warning('Websocket client disconnected')
@@ -25,8 +26,7 @@ class SHEMSwebsocket():
 
     def upgradeNotification(self, payload):
         try:
-            self.paylaod = payload
-            self.__sendNotification()
+            self.payload.append(payload)
             logging.info('Notification sent')
         except:
             logging.error('Sending notification failed')

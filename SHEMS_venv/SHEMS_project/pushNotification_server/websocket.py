@@ -7,7 +7,7 @@ class SHEMSwebsocket():
     def __init__(self, cfg):
         self.server = WebsocketServer(port = cfg['websocket_port'])
         self.server.set_fn_new_client(self.__sendNotification)
-        self.server.set_fn_client_left(self.__clientLeft)
+        #self.server.set_fn_client_left(self.__clientLeft)
         #self.server.set_fn_message_received(self.__messageReceived())
         self.server.run_forever()
 

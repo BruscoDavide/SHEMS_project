@@ -3,6 +3,7 @@ import logging
 import datetime
 
 from urllib import response
+from django.db import DatabaseError
 from django.http.response import HttpResponse
 from django.shortcuts import render
 
@@ -87,10 +88,10 @@ def __read_data(code):
                 flag = False
     if c == t:
         logging.error('Command request cannot be satisfy: error "code" or "main.py" offline') 
-        HttpResponse({'response':'Command request cannot be satisfy: error "code" or "main.py" offline'})
+        return {'response':'Command request cannot be satisfy: error "code" or "main.py" offline'}
     else:
         logging.info('Operation complete')
-        HttpResponse(response)
+        return response
 
 def home(request):
     """Application home page 
@@ -102,7 +103,7 @@ def home(request):
     """
     code = __append_commands(command='home', flag_payload=False)
     data = __read_data(code=code)
-    return HttpResponse(data)
+    return HttpResponse(str(data))
         
 def scheduling(request):
     """ Actual appliances scheduling
@@ -114,7 +115,7 @@ def scheduling(request):
     """
     code = __append_commands(command='scheduling', flag_payload=False)
     data = __read_data(code=code)
-    return HttpResponse(data)
+    return HttpResponse(str(data))
 
 def listDevice(request):
     """ List of actual appliances scheduling
@@ -126,7 +127,7 @@ def listDevice(request):
     """
     code = __append_commands(command='listDevice', flag_payload=False)
     data = __read_data(code=code)
-    return HttpResponse(data)
+    return HttpResponse(str(data))
 
 def changeScheduling(request):
     """ Change the schedule of one appliance, it requires when move the schedule and which appliance will be moved
@@ -143,15 +144,18 @@ def changeScheduling(request):
     """
     try:
         data = json.loads(request.body)
+
+        print(data)
+
         payload = {}
         payload['start_time'] = data['when']
         payload['appliance'] = data['which']
         code = __append_commands(command='changeScheduling', flag_payload=True, payload=payload)
         data = __read_data(code=code)
-        return HttpResponse(data)
+        return HttpResponse(str(data))
     except:
         logging.error('Error "which" or "when" field missing - changeSchduling request')
-        return HttpResponse('Error "which" or "when" field missing')
+        return HttpResponse(str({'message':'Error "which" or "when" field missing'}))
 
 def summary(request):
     """Provide statistic plots data
@@ -163,15 +167,18 @@ def summary(request):
         HttpResponse object
     """
     try:
+
+        print(request.GET)
+
         payload = {}
         payload['start_time'] = request.GET['period']
         payload['appliance'] = request.GET['object']
         code = __append_commands(command='summary', flag_payload=True, payload=payload)
         data = __read_data(code=code)
-        return HttpResponse(data)
+        return HttpResponse(str(data))
     except:
         logging.error('Error "object" or "period" field missing - summary request')
-        return HttpResponse('Error "period" or "object" field missing')
+        return HttpResponse(str({'message':'Error "period" or "object" field missing'}))
 
 def oldParameters(request):
     """ List of actual home parameters
@@ -183,7 +190,7 @@ def oldParameters(request):
     """
     code = __append_commands(command='oldParameters', flag_payload=False)
     data = __read_data(code=code)
-    return HttpResponse(data)
+    return HttpResponse(str(data))
 
 def settings(request):
     """ Allows to update or change home configuration setpoints, delete or add home appliances 
@@ -200,16 +207,19 @@ def settings(request):
         HttpResponse object
     """
     data = json.loads(request.body)
+
+    print(DatabaseError)
+
     if data['action'] == 'changeSetpoints':
         try:
             payload = {}
             payload['new_values'] = data['new_values']
             code = __append_commands(command='changeSetpoints', flag_payload=True, payload=payload)
             data = __read_data(code=code)
-            return HttpResponse(data)
+            return HttpResponse(str(data))
         except:
             logging.error('Error "new_values" field missing - changeSetpoints request')
-            return HttpResponse('Error "action" or "new_value" field missing')
+            return HttpResponse(str({'message':'Error "action" or "new_value" field missing'}))
 
     elif data['action'] == 'addAppliances':
         try:
@@ -228,10 +238,10 @@ def settings(request):
             """
             code = __append_commands(command='addAppliances', flag_payload=True, payload=payload)
             data = __read_data(code=code)
-            return HttpResponse(data)
+            return HttpResponse(str(data))
         except:
             logging.error('Error "applianceData" field missing - addAppliances request')
-            return HttpResponse('Error "applianceData" field missing')
+            return HttpResponse(str({'message':'Error "applianceData" field missing'}))
 
     elif data['action'] == 'deleteAppliances':
         try:
@@ -239,12 +249,12 @@ def settings(request):
             payload = data['applianceData']
             data = __append_commands(command='delete_appliances', flag_payload=True, payload=payload)
             data = __read_data(code=code)
-            return HttpResponse(data)
+            return HttpResponse(str(data))
         except:
             logging.error('Error "applianceData" field missing - deleteAppliances request')
-            return HttpResponse('Error "applianceData" field missing')
+            return HttpResponse(str({'message':'Error "applianceData" field missing'}))
     else:
-        return HttpResponse('Error "action" field missing or wrong')
+        return HttpResponse(str({'message':'Error "action" field missing or wrong'}))
 
 def communityPlots(request):
     """Statistical information about prosumer community
@@ -260,10 +270,10 @@ def communityPlots(request):
         payload['which'] = request.GET['object']
         code = __append_commands(command='community', flag_payload=True, payload=payload)
         data = __read_data(code=code)
-        return HttpResponse(data)
+        return HttpResponse(str(data))
     except:
         logging.error('Error "period" or "object" field missing - communityPlots request')
-        return HttpResponse('Error "period" or "object" field missing')
+        return HttpResponse(str({'message':'Error "period" or "object" field missing'}))
 
 def communityProsumers(request):
     """Statistical information about prosumer community
@@ -275,7 +285,7 @@ def communityProsumers(request):
     """
     code = __append_commands(command='community', flag_payload=True)
     data = __read_data(code=code)
-    return HttpResponse(data)
+    return HttpResponse(str(data))
 
 def registration(request):
     """Home registration in the system
@@ -291,6 +301,7 @@ def registration(request):
     """
     try:
         data = json.loads(request.body)
+
         payload = {}
         payload['family_name'] = data['family_name']
         payload['EV'] = data ['EV']
@@ -300,9 +311,9 @@ def registration(request):
 
         code = __append_commands(command='registration', flag_payload=True, payload=payload)
         data = __read_data(code=code)
-        return HttpResponse(data)
+        return HttpResponse(str(data))
     except:
         logging.error('Error new home field missing - registration request')
-        return HttpResponse('Error new home field missing')
+        return HttpResponse(str({'message':'Error new home field missing'}))
     
     

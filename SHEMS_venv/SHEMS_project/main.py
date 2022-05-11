@@ -271,8 +271,6 @@ class SHEMS_main():
             file = json.load(fp)
             fp.close()
 
-            print('arrivato')
-
             commands = file['commands_list']
             for c in commands:
                 timestamp = c['timestamp']

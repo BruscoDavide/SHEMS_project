@@ -26,6 +26,9 @@ class Instance():
         self.SA = 0 #surface area
         self.Wd = [] #water withdrawn
         self.Cp = 0 #CHECK WHAT THIS PARAMETER IS
+        self.R = 0
+        self.boiler_vol = 0
+        self.boiler_radius = 0
 
         #BATTERY ENERGY SOURCES
         self.car_ownership = 0
@@ -75,6 +78,9 @@ class Instance():
         self.time_granularity = 15 #expressed in minutes, tells the time range of the measures. In this way there are 96 time slots
         self.time_dep = 0 #departure time of PEV
 
+        self.home_dimensions = 0
+        self.U_val = 0
+
     def get_data_serv(self):
         data = self.databaseClient.read_documents(collection_name='home_configuration', document={'_id':0}) 
         data = data['home_setpoints']
@@ -82,7 +88,6 @@ class Instance():
         
         self.Pac_max = data["Pac_max"] #AC max power
         self.Pewh_max = data["Pewh_max"] #Water heater max power
-        self.AC_mode = data["AC_mode"] #1 Heating, -1 Chiller
         self.Tin_max = data["Tin_max"] #max indoor temp
         self.Tin_min = data["Tin_min"] #min indoor temp
         self.Tewh_max = data["Tewh_max"] #max water temp
@@ -103,8 +108,8 @@ class Instance():
         self.R = data['R']
         self.boiler_vol =  data["boiler_vol"]
         self.boiler_radius = data["boiler_radius"]
+        self.SA = data['SA']
         self.Cp = data["Cp"]
-        
         
         #BATTERY ENERGY SOURCES
         data = self.databaseClient.read_documents(collection_name='home_configuration', document={'_id':3}) 
@@ -129,11 +134,8 @@ class Instance():
         self.Cpev_thresh_low = data["Cpev_thresh_low"]
         self.Cpev_thresh_high = data["Cpev_thresh_high"]
 
-        self.Cess_init = data["Cess_init"] #Save the battery status from one day to another
-        self.Cpev_init = data["Cpev_init"] #Save the battery status at the arrival time
-
-        self.Cess_day_before = data["Cess_day_before "] #TODO: find the way to save them in the database for the next day schedule
-        self.Cpev_day_before = data["Cpev_day_before "]
+        self.Cess_day_before = data["Cess_init"] #Save the battery status from one day to another
+        self.Cpev_day_before = data["Cpev_init"] #Save the battery status at the arrival time
 
         #APPLIANCES
         data = self.databaseClient.read_documents(collection_name='home_configuration', document={'_id':4}) 

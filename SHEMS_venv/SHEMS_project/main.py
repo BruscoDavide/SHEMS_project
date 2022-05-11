@@ -11,7 +11,6 @@ from mongoDB.database_client import databaseClient
 from optimizationModel.Simulator.instance import Instance
 from optimizationModel.LP_solver.SHEMSModel import SHEMS
 from prosumerCommunity.prosumerMarket import Prosumer
-from pushNotification_server.websocket import SHEMSwebsocket
 
 class SHEMS_main():
     def __init__(self, cfg):
@@ -33,6 +32,7 @@ class SHEMS_main():
             self.instance = Instance()
             self.instance.get_data_serv()
             self.shems = SHEMS(self.instance)
+            self.shems.solve_definitive()
             
             # Sensors subscriber MQTT
             self.waterWithdrawn_topic = cfg['waterWithdrawn_topic']
@@ -62,10 +62,6 @@ class SHEMS_main():
             else:
                 logging.error(f'Error weather API: {response.status_code}')
 
-            # Push notification
-            self.pushnotification_server = SHEMSwebsocket(cfg)
-            # TODO:contronllo del messaggio, piccola encriptazione del messaggio (in più)
-
             logging.info('Environment generation done')
         except:
             logging.warning('Environment generation failed')
@@ -78,6 +74,8 @@ class SHEMS_main():
         obj = self.databaseClient.read_documents(collection_name='home_configuration', document={'_id':0})
         obj['home_setpoints']['Tin_out'] = self.shems.Tin_out[-1]
         obj['home setpoints']['Tewh_out'] = self.shems.Tewh_out[-1]
+        obj['batteries']['Cess_init'] = self.shems.Cess[-1]
+        obj['batteries']['Cpev_init'] = self.shems.Cpev[-1]
         self.databaseClient.update_documents(collection_name='home_configuration', document={'_id':0}, object=obj)
 
         self.instance.get_data_serv()
@@ -93,12 +91,22 @@ class SHEMS_main():
                 if code == 1: logging.info('Data updated')
                 else: logging.error('Database failed')
                 
-                self.pushnotification_server.upgradeNotification({'message':'First scheduling of the day had success'})
+                payload = {'message':'First scheduling of the day had success'}
+                fp = open('./files/push_notification.json')
+                json.dump(payload, fp)
+                fp.close()
+                #self.websocket_publisher.myPublish(self.websocket_topic, {'message':'First scheduling of the day had success'})
+                #self.pushnotification_server.upgradeNotification({'message':'First scheduling of the day had success'})
                 logging.info('First scheduling of the day had success')
             except:
                 logging.error('Local websocket server or database error')
         elif cod == -1:
-            self.pushnotification_server.upgradeNotification({'message':'First scheduling of the day failed'})
+            payload = {'message':'First scheduling of the day failed'}
+            fp = open('./files/push_notification.json')
+            json.dump(payload, fp)
+            fp.close()
+            #self.websocket_publisher.myPublish(self.websocket_topic, {'message':'First scheduling of the day failed'})
+            #self.pushnotification_server.upgradeNotification({'message':'First scheduling of the day failed'})
             logging.info('First scheduling of the day failed')
     
     def __weatherAPI(self):
@@ -209,18 +217,33 @@ class SHEMS_main():
             if cod == 2:
                 try:
                     self.historyData_saving(step)
-                    self.pushnotification_server.upgradeNotification({'message':'New schedling performed, hot water used'})
+                    payload = {'message':'New schedling performed, hot water used'}
+                    fp = open('./files/push_notification.json')
+                    json.dump(payload, fp)
+                    fp.close()
+                    #self.websocket_publisher.myPublish(self.websocket_topic, {'message':'New schedling performed, hot water used'})
+                    #self.pushnotification_server.upgradeNotification({'message':'New schedling performed, hot water used'})
                     logging.info('New schedling performed, hot water used')
                 except:
                     logging.error('Local websocket server error')
             elif cod == -1:
-                self.pushnotification_server.upgradeNotification({'message':'New scheduling failed. Too much hot water used'})
+                payload = {'message':'New scheduling failed. Too much hot water used'}
+                fp = open('./files/push_notification.json')
+                json.dump(payload, fp)
+                fp.close()
+                #self.websocket_publisher.myPublish(self.websocket_topic, {'message':'New scheduling failed. Too much hot water used'})
+                #self.pushnotification_server.upgradeNotification({'message':'New scheduling failed. Too much hot water used'})
                 logging.warning('New scheduling failed. Too much hot water used')
 
         elif msg.topic == self.carStation_topic:
             if msg.payload == 1:
                 self.shems.set_car_arrival()
-                self.pushnotification_server.upgradeNotification({'message':'Electric vehicle in the garage'})
+                payload = {'message':'Electric vehicle in the garage'}
+                fp = open('./files/push_notification.json')
+                json.dump(payload, fp)
+                fp.close()
+                #self.websocket_publisher.myPublish(self.websocket_topic, {'message':'Electric vehicle in the garage'})
+                #self.pushnotification_server.upgradeNotification({'message':'Electric vehicle in the garage'})
             else: 
                 logging.error('Error in the carStation publisher')
 
@@ -248,6 +271,8 @@ class SHEMS_main():
             file = json.load(fp)
             fp.close()
 
+            print('arrivato')
+
             commands = file['commands_list']
             for c in commands:
                 timestamp = c['timestamp']
@@ -259,6 +284,7 @@ class SHEMS_main():
                 else:
                     step = int(60/self.time_granularity*(24 - (8 - hh)) + math.floor(mm/self.time_granularity))
 
+                
                 if c['command'] == 'home': # on at this moment
                     try:
                         data = {}

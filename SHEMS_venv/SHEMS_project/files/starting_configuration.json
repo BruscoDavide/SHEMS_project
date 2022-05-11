@@ -12,8 +12,9 @@
     "BASE_URL2": "https://api.openweathermap.org/data/2.5/forecast?",
     "time_granularity":15,
     "websocket_port": 52268,
-    "command_path":"./files/GUI_thread_commands.json",
+    "commands_path":"./files/GUI_thread_commands.json",
     "data_path":"./files/GUI_thread_data.json",
     "webServer_command_path": "C:\\Users\\davide.brusco\\Documents\\Coding\\SHEMS\\SHEMS_project\\SHEMS_venv\\shems_project\\files\\GUI_thread_commands.json",
-    "webServer_data_path": "C:\\Users\\davide.brusco\\Documents\\Coding\\SHEMS\\SHEMS_project\\SHEMS_venv\\shems_project\\files\\GUI_thread_data.json"
+    "webServer_data_path": "C:\\Users\\davide.brusco\\Documents\\Coding\\SHEMS\\SHEMS_project\\SHEMS_venv\\shems_project\\files\\GUI_thread_data.json",
+    "websocket_topic": "websocket_topic"
 }

@@ -52,14 +52,6 @@ class SHEMS():
     def get_new_instance(self, instance):
         self.instance = instance
         #when data are changed, the new data have to be retrieved from the server, or they will have to be read from the file
-    
-    def set_status_day_before(self):
-        #TODO: write on server the data to update the instance
-        #Cosi' non va bene
-        self.Tset_off = self.Tin_out[-1]
-        self.Tset_off_wat = self.Tewh_out[-1]
-        self.Cess_day_before = self.Cess[-1]
-        self.Cpev_day_before = self.Cpev[-1]
 
     def set_working_mode(self, payload):
         """
@@ -440,17 +432,17 @@ class SHEMS():
                 # [C] = [C] * [W/(K*m2)]*[m2]*[K]/( [Kg/m3]*[m3] * [J/(Kg*K)] )*sec 
                 #
                 model.addConstr(
-                    T_in[i] == T_in[i-1] + self.instance.U_val*home_wall_area*(self.instance.Tout[start_point + i] - T_in[i-1])*self.instance.time_granularity*60/(10*home_volume*1300) + beta[i]*dT[i]
+                    T_in[i] == T_in[i-1] + self.instance.U_val*home_wall_area*(self.instance.Tout[start_point + i] - T_in[i-1])*self.instance.time_granularity*60/(2.5*home_volume*1300) + beta[i]*dT[i]
                 )
             elif i == 0 and self.first_iteration == 1:
                 model.addConstr(
-                    T_in[i] == self.instance.Tset_off + self.instance.U_val*home_wall_area*(self.instance.Tout[start_point + i] - self.instance.Tset_off)*self.instance.time_granularity*60/(10*home_volume*1300) + beta[i]*dT[i]
+                    T_in[i] == self.instance.Tset_off + self.instance.U_val*home_wall_area*(self.instance.Tout[start_point + i] - self.instance.Tset_off)*self.instance.time_granularity*60/(2.5*home_volume*1300) + beta[i]*dT[i]
                 
                 )
                 
             elif i == 0 and self.first_iteration == 0:
                 model.addConstr(
-                    T_in[i] == self.Tin_out[start_point - 1] + self.instance.U_val*home_wall_area*(self.instance.Tout[start_point + i] - self.instance.Tset_off)*self.instance.time_granularity*60/(10*home_volume*1300) + beta[i]*dT[i]
+                    T_in[i] == self.Tin_out[start_point - 1] + self.instance.U_val*home_wall_area*(self.instance.Tout[start_point + i] - self.instance.Tset_off)*self.instance.time_granularity*60/(2.5*home_volume*1300) + beta[i]*dT[i]
                 )
             model.addConstr(
                     beta[i]*(self.instance.Tout[start_point + i] - self.instance.Tset_off) <= 0

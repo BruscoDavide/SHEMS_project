@@ -1,20 +1,31 @@
 import logging
+import json
 
 from websocket_server import WebsocketServer
-
+from utilities.mqttclient import MQTTPublisher, MQTTSubscriber
 class SHEMSwebsocket():
     def __init__(self, cfg):
-        self.client =  {"id": "SHEMS"}
         self.server = WebsocketServer(port = cfg['websocket_port'])
         self.server.set_fn_new_client(self.__sendNotification)
         self.server.set_fn_client_left(self.__clientLeft)
-        self.server.set_fn_message_received(self.__messageReceived)
+        #self.server.set_fn_message_received(self.__messageReceived())
         self.server.run_forever()
-        self.payload = []
 
     def __sendNotification(self):
-        self.server.send_message_to_all(self.payload)
-        self.payload = []
+        fp = open('./files/push_notification.json')
+        payload = json.load(fp)
+        fp.close()
+        
+        try:
+            self.server.send_message_to_all(payload)
+            print('yes')
+        except:
+            print('nooo')
+
+        payload = []
+        fp = open('./files/push_notification.json', 'w')
+        json.dump(payload, fp)
+        fp.close()
 
     def __clientLeft(self):
         logging.warning('Websocket client disconnected')
@@ -23,11 +34,3 @@ class SHEMSwebsocket():
         if len(message) > 200:
             message = message[:200]+'..'
         logging.info('Message received by the client')
-
-    def upgradeNotification(self, payload):
-        try:
-            self.payload.append(payload)
-            logging.info('Notification sent')
-        except:
-            logging.error('Sending notification failed')
-

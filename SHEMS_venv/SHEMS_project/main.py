@@ -21,18 +21,17 @@ class SHEMS_main():
             cfg (dict): configuration file
         """
         try:
-            #self.__reset()
+            self.__reset()
 
             self.time_granularity = cfg['time_granularity']
             self.commands_path = cfg['commands_path']
             self.data_path = cfg['data_path']
+            self.push_path = cfg['push_path']
 
-            # Energy optimization model
             self.databaseClient = databaseClient()
+            # Energy optimization model
             self.instance = Instance()
-            self.instance.get_data_serv()
-            self.shems = SHEMS(self.instance)
-            self.shems.solve_definitive()
+            self.model = False
             
             # Sensors subscriber MQTT
             self.waterWithdrawn_topic = cfg['waterWithdrawn_topic']
@@ -41,28 +40,34 @@ class SHEMS_main():
             self.deviceID = str(np.random.randint(1000000000))
             self.broker = cfg['mqtt_broker']
             self.port = cfg['mqtt_port']
-            self.sensors_subscriber = MQTTSubscriber(self.deviceID, self.broker, self.port)
-            self.sensors_subscriber.start()
-            self.sensors_subscriber.callbackRegistration(self.__sensorsSubscriber_callback)
-            self.sensors_subscriber.mySubscribe(self.waterWithdrawn_topic)
-            self.sensors_subscriber.mySubscribe(self.carStation_topic)
-            self.sensors_subscriber.mySubscribe(self.smartMeter_topic)
-
+            try:
+                self.sensors_subscriber = MQTTSubscriber(self.deviceID, self.broker, self.port)
+                self.sensors_subscriber.start()
+                self.sensors_subscriber.callbackRegistration(self.__sensorsSubscriber_callback)
+                self.sensors_subscriber.mySubscribe(self.waterWithdrawn_topic)
+                self.sensors_subscriber.mySubscribe(self.carStation_topic)
+                self.sensors_subscriber.mySubscribe(self.smartMeter_topic)
+            except:
+                logging.warning('Possible internet connection problem')
+            
             # Weather forecast API
             self.city = cfg['home_city']
             self.country_code = cfg['country_code']
             self.BASE_URL2 = cfg['BASE_URL2']
             self.API_KEY = cfg['API_KEY']
             limit = 1
-            url = f"http://api.openweathermap.org/geo/1.0/direct?q={self.city},{self.country_code}&limit={limit}&appid={self.API_KEY}"
-            response = requests.get(url)
-            if response.status_code == 200:
-                self.lat = int(response.json()[0]['lat'])
-                self.lon = int(response.json()[0]['lon'])
-            else:
-                logging.error(f'Error weather API: {response.status_code}')
+            try:
+                url = f"http://api.openweathermap.org/geo/1.0/direct?q={self.city},{self.country_code}&limit={limit}&appid={self.API_KEY}"
+                response = requests.get(url)
+                if response.status_code == 200:
+                    self.lat = int(response.json()[0]['lat'])
+                    self.lon = int(response.json()[0]['lon'])
+                else:
+                    logging.error(f'Error weather API: {response.status_code}')
+            except:
+                logging.warning('Possible internet connection problem')
 
-            logging.info('Environment generation done')
+            logging.info('Environment generation done, SHEMS model not active')
         except:
             logging.warning('Environment generation failed')
 
@@ -78,36 +83,44 @@ class SHEMS_main():
         obj['batteries']['Cpev_init'] = self.shems.Cpev[-1]
         self.databaseClient.update_documents(collection_name='home_configuration', document={'_id':0}, object=obj)
 
-        self.instance.get_data_serv()
-        self.shems.get_new_instance(self.instance)
-        
-        cod = self.shems.solve_definitive()
-        if cod == 2:
-            try:
-                data = self.databaseClient.read_documents(collection_name='data_collected', document={'_id':'history'})
-                for j in range(60/self.time_granularity*24):
-                    data['Phouse_consume'].append(self.shems.Phouse_consume[j])
-                code = self.databaseClient.update_documents(collection_name='data_collected', document={'_id':'history'}, object=data)
-                if code == 1: logging.info('Data updated')
-                else: logging.error('Database failed')
+        if self.model:
+            self.instance.get_data_serv()
+            self.shems.get_new_instance(self.instance)
+            
+            cod = self.shems.solve_definitive()
+            if cod == 2:
+                try:
+                    data = self.databaseClient.read_documents(collection_name='data_collected', document={'_id':'history'})
+                    for j in range(60/self.time_granularity*24):
+                        data['Phouse_consume'].append(self.shems.Phouse_consume[j])
+                    code = self.databaseClient.update_documents(collection_name='data_collected', document={'_id':'history'}, object=data)
+                    if code == 1: logging.info('Data updated')
+                    else: logging.error('Database failed')
+                    
+                    payload = {'message':'First scheduling of the day had success'}
+                    fp = open(self.push_path, 'w')
+                    json.dump(payload, fp)
+                    fp.close()
                 
-                payload = {'message':'First scheduling of the day had success'}
-                fp = open('./files/push_notification.json')
+                    logging.info('First scheduling of the day had success')
+                except:
+                    logging.error('Local websocket server or database error')
+            elif cod == -1:
+
+                payload = {'message':'First scheduling of the day failed'}
+                fp = open(self.push_path, 'w')
                 json.dump(payload, fp)
                 fp.close()
-                #self.websocket_publisher.myPublish(self.websocket_topic, {'message':'First scheduling of the day had success'})
-                #self.pushnotification_server.upgradeNotification({'message':'First scheduling of the day had success'})
-                logging.info('First scheduling of the day had success')
-            except:
-                logging.error('Local websocket server or database error')
-        elif cod == -1:
-            payload = {'message':'First scheduling of the day failed'}
-            fp = open('./files/push_notification.json')
+
+                logging.info('First scheduling of the day failed')
+        
+        else:
+            logging.warning('SHEMS model not active')
+            payload = {'message':'SHEMS model not active'}
+            fp = open(self.push_path, 'w')
             json.dump(payload, fp)
             fp.close()
-            #self.websocket_publisher.myPublish(self.websocket_topic, {'message':'First scheduling of the day failed'})
-            #self.pushnotification_server.upgradeNotification({'message':'First scheduling of the day failed'})
-            logging.info('First scheduling of the day failed')
+            
     
     def __weatherAPI(self):
         """Open weather map call to retrive temperature forecast for the day. Stores the results in the database
@@ -216,34 +229,31 @@ class SHEMS_main():
             cod = self.shems.solve_definitive()
             if cod == 2:
                 try:
-                    self.historyData_saving(step)
+                    self.__historyData_saving(step)
+
                     payload = {'message':'New schedling performed, hot water used'}
-                    fp = open('./files/push_notification.json')
+                    fp = open(self.push_path, 'w')
                     json.dump(payload, fp)
                     fp.close()
-                    #self.websocket_publisher.myPublish(self.websocket_topic, {'message':'New schedling performed, hot water used'})
-                    #self.pushnotification_server.upgradeNotification({'message':'New schedling performed, hot water used'})
+
                     logging.info('New schedling performed, hot water used')
                 except:
                     logging.error('Local websocket server error')
             elif cod == -1:
                 payload = {'message':'New scheduling failed. Too much hot water used'}
-                fp = open('./files/push_notification.json')
+                fp = open(self.push_path, 'w')
                 json.dump(payload, fp)
                 fp.close()
-                #self.websocket_publisher.myPublish(self.websocket_topic, {'message':'New scheduling failed. Too much hot water used'})
-                #self.pushnotification_server.upgradeNotification({'message':'New scheduling failed. Too much hot water used'})
                 logging.warning('New scheduling failed. Too much hot water used')
 
         elif msg.topic == self.carStation_topic:
             if msg.payload == 1:
                 self.shems.set_car_arrival()
+
                 payload = {'message':'Electric vehicle in the garage'}
-                fp = open('./files/push_notification.json')
+                fp = open(self.push_path, 'w')
                 json.dump(payload, fp)
                 fp.close()
-                #self.websocket_publisher.myPublish(self.websocket_topic, {'message':'Electric vehicle in the garage'})
-                #self.pushnotification_server.upgradeNotification({'message':'Electric vehicle in the garage'})
             else: 
                 logging.error('Error in the carStation publisher')
 
@@ -282,8 +292,7 @@ class SHEMS_main():
                 else:
                     step = int(60/self.time_granularity*(24 - (8 - hh)) + math.floor(mm/self.time_granularity))
 
-                
-                if c['command'] == 'home': # on at this moment
+                if c['command'] == 'home' and self.model: # on at this moment
                     try:
                         data = {}
                         data['listDevices'] = []
@@ -313,9 +322,7 @@ class SHEMS_main():
                     except:
                         logging.error('"Home" GET request failed')
 
-                    self.__clear_file(self.commands_path)
-
-                elif c['command'] == 'scheduling':
+                elif c['command'] == 'scheduling' and self.model:
                     try:
                         data = {}
                         data['scheduling'] = {}
@@ -377,7 +384,7 @@ class SHEMS_main():
                     except:
                         logging.error('"Shceduling" GET request failed')
 
-                    self.__clear_file(self.commands_path)
+                    self.__clear_file(self.commands_path, timestamp)
                 
                 elif c['command'] == 'listDevice':
                     try:
@@ -390,9 +397,9 @@ class SHEMS_main():
                         logging.info('"listDevice" GET request performed')
                     except:
                         logging.error('"listDevice" GET request failed')
-                    self.__clear_file(self.commands_path)
+                    self.__clear_file(self.commands_path, timestamp)
 
-                elif c['command'] == 'changeScheduling':
+                elif c['command'] == 'changeScheduling' and self.model:
                     try:
                         payload = c['payload'] 
                         payload['command'] = 1
@@ -416,7 +423,7 @@ class SHEMS_main():
                     except:
                         logging.error('"changeSchduling" POST request failed')
 
-                    self.__clear_file(self.commands_path)
+                    self.__clear_file(self.commands_path, timestamp)
 
                 elif c['command'] == 'summary':
                     try:
@@ -539,13 +546,12 @@ class SHEMS_main():
                             requiredData['min'] = min
                             requiredData['max'] = max
 
-                        # TODO: fare in modo che i dati più vecchi di un certo periodo vengano compressi per risparmiare spazio (più tardi)
-                        self.append_data(code=timestamp, data=requiredData)
+                        self.__append_data(code=timestamp, data=requiredData)
 
                         logging.info('"summary" GET request performed')
                     except:
                         logging.error('"summary" GET request failed')
-                    self.__clear_file(self.commands_path)
+                    self.__clear_file(self.commands_path, timestamp)
 
                 elif c['command'] == 'oldParameters':
                     try:
@@ -571,9 +577,9 @@ class SHEMS_main():
                     except:
                         logging.error('"oldParameter" GET request failed')
 
-                    self.__clear_file(self.commands_path)
+                    self.__clear_file(self.commands_path, timestamp)
 
-                elif c['command'] == 'changeSetpoints':
+                elif c['command'] == 'changeSetpoints' and self.model:
                     code = 1
                     payload = c['payload']
 
@@ -585,10 +591,10 @@ class SHEMS_main():
                     code = code*self.databaseClient.update_documents(collection_name='home_configuration', document={'_id':0}, data = data)
 
                     data = self.databaseClient.read_documents(collection_name='home_configuration', document={'_id':3})
-                    data['batteries']['Cess_thresh_low'] = payload['oldParameters']['Cess_thresh_low']
-                    data['batteries']['Cess_thresh_high'] = payload['oldParameters']['Cess_thresh_high'] 
-                    data['batteries']['Cpev_thresh_low'] = payload['oldParameters']['Cpev_thresh_low']
-                    data['batteries']['Cpev_thresh_high'] = payload['oldParameters']['Cpev_thresh_high']
+                    data['batteries']['Cess_thresh_low'] = payload['oldParameters']['Cess_thresh_low']/100
+                    data['batteries']['Cess_thresh_high'] = payload['oldParameters']['Cess_thresh_high']/100
+                    data['batteries']['Cpev_thresh_low'] = payload['oldParameters']['Cpev_thresh_low']/100
+                    data['batteries']['Cpev_thresh_high'] = payload['oldParameters']['Cpev_thresh_high']/100
                     code = code*self.databaseClient.update_documents(collection_name='home_configuration', document={'_id':3}, data = data)
 
                     data = self.databaseClient.read_documents(collection_name='home_configuration', document={'_id':7})
@@ -620,9 +626,9 @@ class SHEMS_main():
                         self.__append_data(code=timestamp, data={'response':'New scheduling failed'})
                         logging.error('New scheduling failed')
                     
-                    self.__clear_file(self.commands_path)
+                    self.__clear_file(self.commands_path, timestamp)
 
-                elif c['command'] == 'addAppliances':
+                elif c['command'] == 'addAppliances' and self.model:
                     payload = c['payload']
                     
                     data = self.databaseClient.read_documents(collection_name='home_configuration', document={'_id':4})
@@ -670,9 +676,9 @@ class SHEMS_main():
                         self.__append_data(code=timestamp, data={'response':'Updating appliances list failed, no new scheduling'})
                         logging.error('Updating appliances list failed, no new scheduling')
 
-                    self.__clear_file(self.commands_path)
+                    self.__clear_file(self.commands_path, timestamp)
 
-                elif c['command'] == 'deleteAppliances':
+                elif c['command'] == 'deleteAppliances' and self.model:
                     payload = c['payload']
                     data = self.databaseClient.read_documents(collection_name='home_configuration', document={'_id':4})
 
@@ -709,7 +715,7 @@ class SHEMS_main():
                         else:
                             logging.warning('Error appliances name wrong, not found')
 
-                    self.__clear_file(self.commands_path)
+                    self.__clear_file(self.commands_path, timestamp)
 
                 elif c['command'] == 'communityPlots':
                     try:
@@ -807,7 +813,7 @@ class SHEMS_main():
                     except:
                         logging.error('communityPlots GET request failed')
 
-                    self.__clear_file(self.commands_path)
+                    self.__clear_file(self.commands_path, timestamp)
 
                 elif c['command'] == 'communityProsumers':
                     try:
@@ -843,16 +849,15 @@ class SHEMS_main():
                             ob['my_tot_price_bought'] += tot_price_bought
                             requiredData.append(ob)
 
-
-                        self.append_data(code=timestamp, data=requiredData)
+                        self.__append_data(code=timestamp, data=requiredData)
 
                         logging.info('"communityProsumers" GET request performed')  
                     except:
                         logging.error('"communityProsumers" GET request failed') 
                     
-                    self.clear_file(self.commands_path) 
+                    self.__clear_file(self.commands_path, timestamp) 
 
-                elif c['command'] == 'registration':
+                elif c['command'] == 'registration' and self.model:
                     try:
                         code = 1
                         payload = c['payload']
@@ -870,10 +875,10 @@ class SHEMS_main():
 
                         # Departure car time, minimum and maximum threashold charging level (home and EV)
                         data = self.databaseClient.read_documents(collection_name='home_configuration', document={'_id':3})
-                        data['batteries']['Cpev_thresh_low'] = payload['EV']['Cpev_thresh_low']
-                        data['batteries']['Cpev_thresh_high'] = payload['EV']['Cpev_thresh_high']
-                        data['batteries']['Cess_thresh_low'] = payload['home_batteries']['Cess_thresh_low']
-                        data['batteries']['Cess_thresh_high'] = payload['home_batteries']['Cess_thresh_high'] 
+                        data['batteries']['Cpev_thresh_low'] = payload['EV']['Cpev_thresh_low']/100
+                        data['batteries']['Cpev_thresh_high'] = payload['EV']['Cpev_thresh_high']/100
+                        data['batteries']['Cess_thresh_low'] = payload['home_batteries']['Cess_thresh_low']/100
+                        data['batteries']['Cess_thresh_high'] = payload['home_batteries']['Cess_thresh_high']/100
                         code = code*self.databaseClient.update_documents('home_configuration', {'_id':3}, data)
 
                         data = self.databaseClient.read_documents(collection_name='home_configuration', document={'_id':7})
@@ -912,36 +917,56 @@ class SHEMS_main():
                         if code == 1:
                             self.__append_data(code=timestamp, data={'response':'New user registration success'})
                             logging.info('New registration success')
+
+                            # first modelling computation after registration
+                            try:
+                                self.instance.get_data_serv()
+                                self.shems = SHEMS(self.instance)
+                                self.shems.solve_definitive()
+                                self.model = True
+                            except:
+                                logging.error('New user registration failed, mathematical model error')
+
                         else:
                             self.__append_data(code=timestamp, data={'response':'New user registration failed, database error'})    
-                            logging.error('New registration failed, database error')
+                            logging.error('New user registration failed, database error')
                     except:
                         self.__append_data(code=timestamp, data={'response':'New user registration failed'})
-                        logging.error('Error new user registration failed')
+                        logging.error('New user registration failed')
 
-                    self.__clear_file(self.commands_path)
+                    self.__clear_file(self.commands_path, timestamp)
+                elif self.model == False:
+                    logging.warning('SHEMS model not active')
+                    payload = {'message':'SHEMS model not active'}
+                    fp = open(self.push_path, 'w')
+                    json.dump(payload, fp)
+                    fp.close()
         except:
             logging.error('User command reading or execution error')
 
-    def __clear_file(self, path):
-        # TODO:azzeramento file comandi, attenzione da gestire se ho più comandi insieme
+    def __clear_file(self, path, timestmap=None):
         try:
+            fp = open(path)
+            file = json.load(fp)
+            fp.close
+
+            if timestmap != None:
+                if path == self.commands_path:
+                    for c in range(file['command_list']):
+                        if file['command_list'][c]['timestamp'] == timestmap:
+                            file['command_list'].remove(c)    
+                elif path == self.data_path:
+                    del file['responses'][timestmap]    
+            else:
+                if path == self.commands_path: file = {"commands_list":[]}
+                elif path == self.data_path: file = {"responses":{}}
+
             fp = open(path, 'w')
-            json.dump({'commands_list':[]},fp)
-            fp.close()
+            json.dump(file)
 
             logging.info('GUI_thread_commands.json cleaned')
         except:
             logging.error('GUI_thread_commands.json error')
-        """
-        fp = open(path)
-        file = json.load(fp)
-        fp.close
-        del file[command]
-        fp = open(path, 'w')
-        json.dump(file)
-        fp.close
-        """
 
     def __append_data(self, code, data):
         """Append data to GUI_thread_data.json

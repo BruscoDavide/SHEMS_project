@@ -145,8 +145,6 @@ def changeScheduling(request):
     try:
         data = json.loads(request.body)
 
-        print(data)
-
         payload = {}
         payload['start_time'] = data['when']
         payload['appliance'] = data['which']
@@ -167,9 +165,6 @@ def summary(request):
         HttpResponse object
     """
     try:
-
-        print(request.GET)
-
         payload = {}
         payload['start_time'] = request.GET['period']
         payload['appliance'] = request.GET['object']
@@ -207,8 +202,6 @@ def settings(request):
         HttpResponse object
     """
     data = json.loads(request.body)
-
-    print(DatabaseError)
 
     if data['action'] == 'changeSetpoints':
         try:

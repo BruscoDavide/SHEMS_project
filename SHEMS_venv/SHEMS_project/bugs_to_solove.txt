@@ -1,0 +1,13 @@
+1. come richiamare registrazione da zero
+2. quando lanciare per la prima volta solve_definitive()? Dopo registration! Ho bisogno che quando concludo la registration siano stati inseriti anche gli appliances
+3. % all'inserimento delle percentuali di batterie o indicazione 0-10
+- nel repor: nel database non c'è lo scehduling salvato
+
+4. GET /user 404
+5. se lo scheduling non è calcolato ... non mi da nulla
+
+
+
+
+5. POST settings: i need to insert all the data or only what I interested in?
+

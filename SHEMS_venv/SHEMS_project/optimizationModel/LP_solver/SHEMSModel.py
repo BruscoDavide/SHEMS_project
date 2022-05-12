@@ -267,7 +267,7 @@ class SHEMS():
                 for t in range(self.instance.N_sched_appliances):
                     appliance_consumption_tmp = self.ud_out[start_point+i][t]*self.instance.sched_appliances["power_cons"][t]
                 self.Phouse_consume[start_point+i] = self.Pac_out[start_point+i] + self.Pewh_out[start_point+i] + appliance_consumption_tmp + self.instance.daily_mean_EA[start_point+i]
-                self.Pselling[start_point+i] = self.Phouse_consume[start_point+i] + self.instance.RES_hour_gen[start_point+i]
+                self.Pselling[start_point+i] = self.Phouse_consume[start_point+i] - self.instance.RES_hour_gen[start_point+i]
                     #print("\n")
             if self.first_iteration == 1:        
                 self.first_iteration = 0
@@ -332,7 +332,7 @@ class SHEMS():
         Q = model.addVars(
             int(remaining_minutes/self.instance.time_granularity),
             lb = 0, #same here, assign them randomly, but more or less taking in account the real life devices limitations
-            ub = (0.947)*self.instance.Pewh_max, #0.947 is the conversion factor from BTU/h to BTU/s
+            ub = (0.947)*6*self.instance.Pewh_max, #0.947 is the conversion factor from BTU/h to BTU/s
             vtype = GRB.CONTINUOUS,
             name = "Q"
         )
@@ -755,14 +755,16 @@ class SHEMS():
         self.Cess[start_point+1:] = 0 #then the system needs a function that gets the power levels
         self.Pess[start_point+1:] = 0 #to check the total level of the battery during the day
         self.Pess_ch[start_point+1:] = 0 #to check the delta charge/discharge over the day
-        Cess_day_before = self.instance.Cess_day_before 
-        
+        #########################################
+        Cess_day_before = 0 #NEED FUNCTION
+        ########################################
 
         self.Cpev[start_point+1:] = 0
         self.Ppev[start_point+1:] = 0 #to check the total level of the battery during the day
         self.Ppev_ch[start_point+1:] = 0 #to check the delta charge/discharge over the day
-        Cpev_day_before = self.instance.Cpev_day_before
-        
+        #########################################
+        Cpev_day_before = 0 #NEED FUNCTION
+        ########################################
 
         self.Pess_chable[start_point+1:] = 0 
         self.Pess_disable[start_point+1:] = 0
@@ -772,50 +774,56 @@ class SHEMS():
         self.Pg_market[start_point+1:] = 0
 
         self.delta_t = 60/self.instance.time_granularity #in the first case it is delta_t = 0.25h
-        if self.instance.ess_ownership == 1:
+        if self.instance.ess_ownership == 0 and self.instance.pev_ownership == 0:
             for i in range(int(remaining_minutes/self.instance.time_granularity)):
                 self.Pg_market[start_point + i] = self.Pg_out[start_point + i]
                 
 
-        elif self.instance.ess_ownership == 1:
+        elif self.instance.ess_ownership == 1 or self.instance.pev_ownership == 1:
             for i in range(int(remaining_minutes/self.instance.time_granularity)):
                 #STEP 1: COMPUTE THE AVAILABLE ENERGY TO BE CHARGED AND DISCHARGED
                 #
-                if i == 0 and start_point == 0:
-                    """
-                    NOTA: the capacity is expressed in kWh, but in our case the time_granularity is in minutes, 15 minutes slots.
-                    So when doing the computations we need to pay attention how we compute the Chable.
-                    We do the subtraction between upper limit and actual capacity and we obtain something which is kWh. To transform it in power we need to divide it
-                    by the time duration so we remain with Watts. The time granularity is in minutes, so we have to transform it in minutes => kWh = 60kWmin, kWmin = kWh/60
-                    Our time slot has a length of 15 minutes, so we have to multiply by 15, so the final capacity becomes expressed in function of the time slots => kW15min = kWh*15/60 = kWh/4
-                    This is only the capacity, so now we can derive the Watts => P = C/time_slot
-                    Now the measures are compatible and we obtain the amount of power that we can load into the battery in that time slot.
-                    Remember then to divide by the charging inefficiency to obtain the real power needed to inject.
-                    """
-                    self.Pess_chable[start_point + i] = ( (self.instance.Cess_thresh_high*self.instance.Cess_max - Cess_day_before) / self.instance.charge_eff_ESS ) #/ self.delta_t # avail_Capacity/60*15 [kWmin * min]
-                    if Cess_day_before <= 0:
-                        self.Pess_disable[start_point + i] = 0
-                    else:
-                        tmp = (Cess_day_before - self.instance.Cess_thresh_low*self.instance.Cess_max)
-                        if tmp < 0: #if the energy available is lower than the lower bound, than the battery can't be discharged
+                if self.instance.ess_ownership == 1:
+                    if i == 0 and start_point == 0:
+                        """
+                        NOTA: the capacity is expressed in kWh, but in our case the time_granularity is in minutes, 15 minutes slots.
+                        So when doing the computations we need to pay attention how we compute the Chable.
+                        We do the subtraction between upper limit and actual capacity and we obtain something which is kWh. To transform it in power we need to divide it
+                        by the time duration so we remain with Watts. The time granularity is in minutes, so we have to transform it in minutes => kWh = 60kWmin, kWmin = kWh/60
+                        Our time slot has a length of 15 minutes, so we have to multiply by 15, so the final capacity becomes expressed in function of the time slots => kW15min = kWh*15/60 = kWh/4
+                        This is only the capacity, so now we can derive the Watts => P = C/time_slot
+                        Now the measures are compatible and we obtain the amount of power that we can load into the battery in that time slot.
+                        Remember then to divide by the charging inefficiency to obtain the real power needed to inject.
+                        """
+                        self.Pess_chable[start_point + i] = ( (self.instance.Cess_thresh_high*self.instance.Cess_max - Cess_day_before) / self.instance.charge_eff_ESS ) #/ self.delta_t # avail_Capacity/60*15 [kWmin * min]
+                        if Cess_day_before <= 0:
                             self.Pess_disable[start_point + i] = 0
                         else:
-                            self.Pess_disable[start_point + i] = ( (Cess_day_before - self.instance.Cess_thresh_low*self.instance.Cess_max) * self.instance.disch_eff_ESS ) / self.delta_t
-                else: 
-                    self.Pess_chable[start_point + i] = ( (self.instance.Cess_thresh_high*self.instance.Cess_max - self.Cess[start_point + i-1]) / self.instance.charge_eff_ESS ) #/ self.delta_t
-                    if self.Cess[start_point + i-1] <= 0:
-                        self.Pess_disable[start_point + i] = 0
-                    else:
-                        tmp = (self.Cess[start_point + i -1] - self.instance.Cess_thresh_low*self.instance.Cess_max) 
-                        if tmp < 0: #if the energy available is lower than the lower bound, than the battery can't be discharged
-                            self.Pess_disable[start_point + i] = 0 
+                            tmp = (Cess_day_before - self.instance.Cess_thresh_low*self.instance.Cess_max)
+                            if tmp < 0: #if the energy available is lower than the lower bound, than the battery can't be discharged
+                                self.Pess_disable[start_point + i] = 0
+                            else:
+                                self.Pess_disable[start_point + i] = ( (Cess_day_before - self.instance.Cess_thresh_low*self.instance.Cess_max) * self.instance.disch_eff_ESS ) / self.delta_t
+                    else: 
+                        self.Pess_chable[start_point + i] = ( (self.instance.Cess_thresh_high*self.instance.Cess_max - self.Cess[start_point + i-1]) / self.instance.charge_eff_ESS ) #/ self.delta_t
+                        if self.Cess[start_point + i-1] <= 0:
+                            self.Pess_disable[start_point + i] = 0
                         else:
-                            self.Pess_disable[start_point + i] = ( (self.Cess[start_point + i -1] - self.instance.Cess_thresh_low*self.instance.Cess_max) * self.instance.disch_eff_ESS ) #/ self.delta_t
+                            tmp = (self.Cess[start_point + i -1] - self.instance.Cess_thresh_low*self.instance.Cess_max) 
+                            if tmp < 0: #if the energy available is lower than the lower bound, than the battery can't be discharged
+                                self.Pess_disable[start_point + i] = 0 
+                            else:
+                                self.Pess_disable[start_point + i] = ( (self.Cess[start_point + i -1] - self.instance.Cess_thresh_low*self.instance.Cess_max) * self.instance.disch_eff_ESS ) #/ self.delta_t
+                
+                else:
+                    #do nothing since all the charges are already set to 0 or they were resetted previously
+                    pass
+                
                 #STEP 2: CHARGE/DISCHARGE THE BATTERIES
                 #
                 #
                 # 2a: VEHICLE NOT AT HOME 
-                if self.vehicle_at_home == 0: 
+                if self.vehicle_at_home == 0 and self.instance.ess_ownership == 1: 
                     P1 = self.Pg_out[start_point + i]
                     if P1 < 0: #energy surplus 
                         #charge the battery with the extra power

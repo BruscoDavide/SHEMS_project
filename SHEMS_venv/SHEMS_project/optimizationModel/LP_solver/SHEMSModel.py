@@ -275,6 +275,8 @@ class SHEMS():
            
             #self.get_plots()
             self.battery_schedule(start_point)
+            for i in range(int(remaining_minutes/self.instance.time_granularity)):
+                self.Pselling[start_point+i] = self.Pselling[start_point+i] - self.Pess[start_point+i] - self.Ppev[start_point+i]
             return 2
         else:
             return -1

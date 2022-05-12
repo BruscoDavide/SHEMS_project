@@ -776,12 +776,12 @@ class SHEMS():
         self.Pg_market[start_point+1:] = 0
 
         self.delta_t = 60/self.instance.time_granularity #in the first case it is delta_t = 0.25h
-        if self.instance.ess_ownership == 0 and self.instance.pev_ownership == 0:
+        if self.instance.ess_ownership == 0 and self.instance.car_ownership == 0:
             for i in range(int(remaining_minutes/self.instance.time_granularity)):
                 self.Pg_market[start_point + i] = self.Pg_out[start_point + i]
                 
 
-        elif self.instance.ess_ownership == 1 or self.instance.pev_ownership == 1:
+        elif self.instance.ess_ownership == 1 or self.instance.car_ownership == 1:
             for i in range(int(remaining_minutes/self.instance.time_granularity)):
                 #STEP 1: COMPUTE THE AVAILABLE ENERGY TO BE CHARGED AND DISCHARGED
                 #

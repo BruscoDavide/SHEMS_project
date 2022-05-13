@@ -1,14 +1,14 @@
 import json
 import logging
 import datetime
+import time 
 
 from urllib import response
 from django.db import DatabaseError
 from django.http.response import HttpResponse
 from django.shortcuts import render
 
-#TODO: RENDERE INDIPENDENTE DAL PATH 
-fp = open("C:\\Users\\davide.brusco\\Documents\\Coding\\SHEMS\\SHEMS_project\\SHEMS_venv\\shems_project\\files\\starting_configuration.json")
+fp = open("./files/starting_configuration.json")
 data = json.load(fp)
 fp.close()
 commands_path = data['webServer_command_path']
@@ -101,8 +101,11 @@ def home(request):
     Returns:
         HttpResponse object
     """
+    s = time.time()
     code = __append_commands(command='home', flag_payload=False)
     data = __read_data(code=code)
+    e = time.time()
+    logging.info(f'"home" timing {s-e}')
     return HttpResponse(str(data))
         
 def scheduling(request):
@@ -113,8 +116,11 @@ def scheduling(request):
     Returns:
         HttpResponse object
     """
+    s = time.time()
     code = __append_commands(command='scheduling', flag_payload=False)
     data = __read_data(code=code)
+    e = time.time()
+    logging.info(f'"scheduling" timing {s-e}')
     return HttpResponse(str(data))
 
 def listDevice(request):
@@ -125,8 +131,11 @@ def listDevice(request):
     Returns:
         HttpResponse object
     """
+    s = time.time() 
     code = __append_commands(command='listDevice', flag_payload=False)
     data = __read_data(code=code)
+    e = time.time()
+    logging.info(f'"listDevice" timing {s-e}')
     return HttpResponse(str(data))
 
 def changeScheduling(request):
@@ -143,6 +152,7 @@ def changeScheduling(request):
         HttpResponse object
     """
     try:
+        s = time.time()
         data = json.loads(request.body)
 
         payload = {}
@@ -150,6 +160,8 @@ def changeScheduling(request):
         payload['appliance'] = data['which']
         code = __append_commands(command='changeScheduling', flag_payload=True, payload=payload)
         data = __read_data(code=code)
+        e = time.time()
+        logging.info(f'"changeScheduling" timing {s-e}')
         return HttpResponse(str(data))
     except:
         logging.error('Error "which" or "when" field missing - changeSchduling request')
@@ -165,11 +177,14 @@ def summary(request):
         HttpResponse object
     """
     try:
+        s = time.time()
         payload = {}
         payload['start_time'] = request.GET['period']
         payload['appliance'] = request.GET['object']
         code = __append_commands(command='summary', flag_payload=True, payload=payload)
         data = __read_data(code=code)
+        e = time.time()
+        logging.info(f'"summary" timing {s-e}')
         return HttpResponse(str(data))
     except:
         logging.error('Error "object" or "period" field missing - summary request')
@@ -183,8 +198,11 @@ def oldParameters(request):
     Returns:
         HttpResponse object
     """
+    s = time.time()
     code = __append_commands(command='oldParameters', flag_payload=False)
     data = __read_data(code=code)
+    e = time.time()
+    logging.info(f'"oldParameters" timing {s-e}')
     return HttpResponse(str(data))
 
 def settings(request):
@@ -201,6 +219,7 @@ def settings(request):
     Returns:
         HttpResponse object
     """
+    s = time.time()
     data = json.loads(request.body)
 
     if data['action'] == 'changeSetpoints':
@@ -209,6 +228,8 @@ def settings(request):
             payload['new_values'] = data['new_values']
             code = __append_commands(command='changeSetpoints', flag_payload=True, payload=payload)
             data = __read_data(code=code)
+            e = time.time()
+            logging.info(f'"settings" timing {s-e}')
             return HttpResponse(str(data))
         except:
             logging.error('Error "new_values" field missing - changeSetpoints request')
@@ -231,6 +252,8 @@ def settings(request):
             """
             code = __append_commands(command='addAppliances', flag_payload=True, payload=payload)
             data = __read_data(code=code)
+            e = time.time()
+            logging.info(f'"settings" timing {s-e}')
             return HttpResponse(str(data))
         except:
             logging.error('Error "applianceData" field missing - addAppliances request')
@@ -242,6 +265,8 @@ def settings(request):
             payload = data['applianceData']
             data = __append_commands(command='delete_appliances', flag_payload=True, payload=payload)
             data = __read_data(code=code)
+            e = time.time()
+            logging.info(f'"settings" timing {s-e}')
             return HttpResponse(str(data))
         except:
             logging.error('Error "applianceData" field missing - deleteAppliances request')
@@ -258,11 +283,14 @@ def communityPlots(request):
         HttpResponse object
     """
     try:
+        s = time.time()
         payload = {}
         payload['when'] = request.GET['period']
         payload['which'] = request.GET['object']
         code = __append_commands(command='community', flag_payload=True, payload=payload)
         data = __read_data(code=code)
+        e = time.time()
+        logging.info(f'"communityPlots" timing {s-e}')
         return HttpResponse(str(data))
     except:
         logging.error('Error "period" or "object" field missing - communityPlots request')
@@ -276,8 +304,11 @@ def communityProsumers(request):
     Returns:
         HttpResponse object
     """
+    s = time.time()
     code = __append_commands(command='community', flag_payload=True)
     data = __read_data(code=code)
+    e = time.time()
+    logging.info(f'"communityProsumer" timing {s-e}')
     return HttpResponse(str(data))
 
 def registration(request):
@@ -293,6 +324,7 @@ def registration(request):
         HttpResponse object
     """
     try:
+        s = time.time()
         data = json.loads(request.body)
 
         payload = {}
@@ -304,9 +336,9 @@ def registration(request):
 
         code = __append_commands(command='registration', flag_payload=True, payload=payload)
         data = __read_data(code=code)
+        e = time.time()
+        logging.info(f'"registration" timing {s-e}')
         return HttpResponse(str(data))
     except:
         logging.error('Error new home field missing - registration request')
         return HttpResponse(str({'message':'Error new home field missing'}))
-    
-    

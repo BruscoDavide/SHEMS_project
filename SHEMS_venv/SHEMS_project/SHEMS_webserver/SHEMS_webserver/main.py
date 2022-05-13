@@ -6,7 +6,7 @@ import datetime
 import numpy as np
 
 from utilities.timer import perpetualTimer
-from utilities.mqttclient import MQTTSubscriber, MQTTPublisher
+from utilities.mqttclient import MQTTSubscriber
 from mongoDB.database_client import databaseClient
 from optimizationModel.Simulator.instance import Instance
 from optimizationModel.LP_solver.SHEMSModel import SHEMS

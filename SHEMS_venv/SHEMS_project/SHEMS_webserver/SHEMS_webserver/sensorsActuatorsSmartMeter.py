@@ -1,4 +1,3 @@
-import time
 import json
 import logging
 import numpy as np
@@ -22,7 +21,7 @@ class EV_publisher():
             self.EV_topic = cfg['carStation_topic']
             self.status = None
         except:
-            logging.info('EV_publisher does not created')
+            logging.info('EV_publisher does not created: possible internet connection problem')
 
     def EV_notify(self):
         """EV arriving or departure
@@ -53,7 +52,7 @@ class HW_publisher():
             self.publisher.start()
             self.EV_topic = cfg['waterWithdrawn_topic']
         except:
-            logging.info('HW_publisher does not created')
+            logging.info('HW_publisher does not created: possible internet connection problem')
 
     def HW_notify(self):
         """HW used amount
@@ -83,7 +82,7 @@ class smartMeter():
             self.SM_topic = cfg['smartMeter_topic']
             self.time_granularity = cfg['time_granularity']
         except:
-            logging.info('Smart meter does not created')
+            logging.info('Smart meter does not created: possible internet connection problem')
 
     def RTP_notify(self):
         """
@@ -134,7 +133,7 @@ class generalAppliances_subscriber():
             #self.generalAppliances_topic = str(self.clientID)+'_topic'
             #self.subscriber.mySubscribe(self.generalAppliances_topic)
         except:
-            logging.info(f'General appliance does not created')
+            logging.info(f'General appliance does not created: possible internet connection problem')
     
     def subscriber_callback(self, msg):
         pass
@@ -162,15 +161,15 @@ if __name__ == '__main__':
         appliances.append(generalAppliances_subscriber(cfg))
 
     # 60*60*8 every 8 hours
-    EV_timer = perpetualTimer(t=, hFunction=EV.EV_notify) 
-    EV_timer.start()
+    #EV_timer = perpetualTimer(t=, hFunction=EV.EV_notify) 
+    #EV_timer.start()
 
     # 60*60*7 every 7 hours
-    HW_timer = perpetualTimer(t=, hFunction=HW.HW_notify)
-    HW_timer.start()
+    #HW_timer = perpetualTimer(t=, hFunction=HW.HW_notify)
+    #HW_timer.start()
 
     # 8 a.m.   24*60*60 every day
-    SM = perpetualTimer(t=, hFunction=SM.RTP_notify)
+    SM = perpetualTimer(t=24*60*60, hFunction=SM.RTP_notify)
     SM.start()
 
     while True:

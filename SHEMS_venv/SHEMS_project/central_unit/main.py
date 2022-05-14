@@ -318,6 +318,7 @@ class SHEMS_main():
 
                         self.__append_data(code=timestamp, data=data)
                         
+                        
                         logging.info('"Home" GET request performed')
                     except:
                         logging.error('"Home" GET request failed')
@@ -383,8 +384,6 @@ class SHEMS_main():
                         logging.info('"Scheduling" GET request performed')
                     except:
                         logging.error('"Shceduling" GET request failed')
-
-                    self.__clear_file(self.commands_path, timestamp)
                 
                 elif c['command'] == 'listDevice':
                     try:
@@ -397,7 +396,6 @@ class SHEMS_main():
                         logging.info('"listDevice" GET request performed')
                     except:
                         logging.error('"listDevice" GET request failed')
-                    self.__clear_file(self.commands_path, timestamp)
 
                 elif c['command'] == 'changeScheduling' and self.model:
                     try:
@@ -422,8 +420,6 @@ class SHEMS_main():
                         logging.info('"changeSchduling" POST request performed')
                     except:
                         logging.error('"changeSchduling" POST request failed')
-
-                    self.__clear_file(self.commands_path, timestamp)
 
                 elif c['command'] == 'summary':
                     try:
@@ -551,38 +547,29 @@ class SHEMS_main():
                         logging.info('"summary" GET request performed')
                     except:
                         logging.error('"summary" GET request failed')
-                    self.__clear_file(self.commands_path, timestamp)
 
                 elif c['command'] == 'oldParameters':
                     try:
-                        print('1')
                         info = self.databaseClient.read_documents(collection_name='home_configuration', document={'_id':0})
-                        print('1.5')
                         data = {}
+                        data['oldParameters'] = {}
                         data['oldParameters']['Tin_max'] = info['home_setpoints']['Tin_max']
                         data['oldParameters']['Tin_min']  = info['home_setpoints']['Tin_min']
-                        print('1.7')
                         data['oldParameters']['Tewh_max'] = info['home_setpoints']['Tewh_max']
                         data['oldParameters']['Tewh_min'] = info['home_setpoints']['Tewh_min']
-                        print('2')
                         info = self.databaseClient.read_documents(collection_name='home_configuration', document={'_id':3})
                         data['oldParameters']['Cess_thresh_low'] = info['batteries']['Cess_thresh_low']
                         data['oldParameters']['Cess_thresh_high'] = info['batteries']['Cess_thresh_high']
                         data['oldParameters']['Cpev_thresh_low'] = info['batteries']['Cpev_thresh_low']
                         data['oldParameters']['Cpev_thresh_high'] = info['batteries']['Cpev_thresh_high']
-                        print(3)
                         info = self.databaseClient.read_documents(collection_name='home_configuration', document={'_id':7})
-                        data['oldParameters']['Time_deperature'] = info['batteries']['time_dep']
-
-                        print(data)
+                        data['oldParameters']['Time_deperature'] = info['time']['time_dep']
 
                         self.__append_data(code=timestamp, data=data)
 
-                        logging.info('"oldParameter" GET request performed')
+                        logging.info('"oldParameters" GET request performed')
                     except:
-                        logging.error('"oldParameter" GET request failed')
-
-                    self.__clear_file(self.commands_path, timestamp)
+                        logging.error('"oldParameters" GET request failed')
 
                 elif c['command'] == 'changeSetpoints' and self.model:
                     code = 1
@@ -630,8 +617,6 @@ class SHEMS_main():
                     elif cod == -1:
                         self.__append_data(code=timestamp, data={'response':'New scheduling failed'})
                         logging.error('New scheduling failed')
-                    
-                    self.__clear_file(self.commands_path, timestamp)
 
                 elif c['command'] == 'addAppliances' and self.model:
                     payload = c['payload']
@@ -681,8 +666,6 @@ class SHEMS_main():
                         self.__append_data(code=timestamp, data={'response':'Updating appliances list failed, no new scheduling'})
                         logging.error('Updating appliances list failed, no new scheduling')
 
-                    self.__clear_file(self.commands_path, timestamp)
-
                 elif c['command'] == 'deleteAppliances' and self.model:
                     payload = c['payload']
                     data = self.databaseClient.read_documents(collection_name='home_configuration', document={'_id':4})
@@ -719,8 +702,6 @@ class SHEMS_main():
                                 logging.info('Updating appliances list failed')
                         else:
                             logging.warning('Error appliances name wrong, not found')
-
-                    self.__clear_file(self.commands_path, timestamp)
 
                 elif c['command'] == 'communityPlots':
                     try:
@@ -818,8 +799,6 @@ class SHEMS_main():
                     except:
                         logging.error('communityPlots GET request failed')
 
-                    self.__clear_file(self.commands_path, timestamp)
-
                 elif c['command'] == 'communityProsumers':
                     try:
                         data = self.databaseClient.read_documents(collection_name='data_collected', document={'_id':'hisotry'})
@@ -859,8 +838,6 @@ class SHEMS_main():
                         logging.info('"communityProsumers" GET request performed')  
                     except:
                         logging.error('"communityProsumers" GET request failed') 
-                    
-                    self.__clear_file(self.commands_path, timestamp) 
 
                 elif c['command'] == 'registration':
                     try:
@@ -944,13 +921,15 @@ class SHEMS_main():
                         self.__append_data(code=timestamp, data={'response':'New user registration failed'})
                         logging.error('New user registration failed')
 
-                    self.__clear_file(self.commands_path, timestamp)
                     if self.model == False:
                         logging.warning('SHEMS model not active')
                         payload = {'message':'SHEMS model not active'}
                         fp = open(self.push_path, 'w')
                         json.dump(payload, fp)
                         fp.close()
+
+                self.__clear_file(path=self.commands_path, timestamp=timestamp)
+
         except:
             logging.error('User command reading or execution error')
 

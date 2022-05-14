@@ -1,12 +1,14 @@
 
-1. home request arrive to the server randmly every seconds
+1. home request arrive to the server randmly every seconds ---> solved
 2. home dosn't show the data provided by the system
 3. visually the app is not ok, sometimes some icons cannot be seen...
-4. schduling has  a long list of icons... it dosn'work
+4. schduling has a long list of icons... 
+
 5. summary.. i don't understand if it is working or not, then wrong url
  /summary2?period=day&object=consumption HTTP/1.1" 404 3514
 8. community, wrong url
  "GET /plots?period=energyBought HTTP/1.1" 404 3491
+ 
 9. settings is not working, old data...
 
 

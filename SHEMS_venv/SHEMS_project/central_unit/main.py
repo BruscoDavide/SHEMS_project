@@ -555,21 +555,26 @@ class SHEMS_main():
 
                 elif c['command'] == 'oldParameters':
                     try:
+                        print('1')
                         info = self.databaseClient.read_documents(collection_name='home_configuration', document={'_id':0})
+                        print('1.5')
                         data = {}
                         data['oldParameters']['Tin_max'] = info['home_setpoints']['Tin_max']
                         data['oldParameters']['Tin_min']  = info['home_setpoints']['Tin_min']
+                        print('1.7')
                         data['oldParameters']['Tewh_max'] = info['home_setpoints']['Tewh_max']
                         data['oldParameters']['Tewh_min'] = info['home_setpoints']['Tewh_min']
-
+                        print('2')
                         info = self.databaseClient.read_documents(collection_name='home_configuration', document={'_id':3})
                         data['oldParameters']['Cess_thresh_low'] = info['batteries']['Cess_thresh_low']
                         data['oldParameters']['Cess_thresh_high'] = info['batteries']['Cess_thresh_high']
                         data['oldParameters']['Cpev_thresh_low'] = info['batteries']['Cpev_thresh_low']
                         data['oldParameters']['Cpev_thresh_high'] = info['batteries']['Cpev_thresh_high']
-
+                        print(3)
                         info = self.databaseClient.read_documents(collection_name='home_configuration', document={'_id':7})
                         data['oldParameters']['Time_deperature'] = info['batteries']['time_dep']
+
+                        print(data)
 
                         self.__append_data(code=timestamp, data=data)
 
@@ -857,47 +862,53 @@ class SHEMS_main():
                     
                     self.__clear_file(self.commands_path, timestamp) 
 
-                elif c['command'] == 'registration' and self.model:
+                elif c['command'] == 'registration':
                     try:
                         code = 1
                         payload = c['payload']
                         data = {}
 
-                        data['name'] = payload['family_name']
-                        
+                        data['name'] = payload['family_name']['family_name']
+
                         # Minimum and maximum temperature of the environment and of the WH
                         data = self.databaseClient.read_documents(collection_name='home_configuration', document={'_id':0})
-                        data['home_setpoints']['Tin_max'] = payload['setpoints']['Tin_max']
-                        data['home_setpoints']['Tin_min'] = payload['setpoints']['Tin_min']
-                        data['home_setpoints']['Tewh_max'] = payload['setpoints']['Tewh_max']
-                        data['home_setpoints']['Tewh_min'] = payload['setpoints']['Tewh_min']
+                        data['home_setpoints']['Tin_max'] = int(payload['setpoints']['Tin_max'])
+                        data['home_setpoints']['Tin_min'] = int(payload['setpoints']['Tin_min'])
+                        data['home_setpoints']['Tewh_max'] = int(payload['setpoints']['Tewh_max'])
+                        data['home_setpoints']['Tewh_min'] = int(payload['setpoints']['Tewh_min'])
                         code = code*self.databaseClient.update_documents('home_configuration', {'_id':0}, data)
-
                         # Departure car time, minimum and maximum threashold charging level (home and EV)
                         data = self.databaseClient.read_documents(collection_name='home_configuration', document={'_id':3})
-                        data['batteries']['Cpev_thresh_low'] = payload['EV']['Cpev_thresh_low']/100
-                        data['batteries']['Cpev_thresh_high'] = payload['EV']['Cpev_thresh_high']/100
-                        data['batteries']['Cess_thresh_low'] = payload['home_batteries']['Cess_thresh_low']/100
-                        data['batteries']['Cess_thresh_high'] = payload['home_batteries']['Cess_thresh_high']/100
+                        try:
+                            data['batteries']['Cpev_thresh_low'] = int(payload['EV']['Cpev_thresh_low']/100)
+                            data['batteries']['Cpev_thresh_high'] = int(payload['EV']['Cpev_thresh_high']/100)
+                            self.instance.car_ownership = 1
+                            data['batteries']['car_ownership'] = 1
+                        except:
+                            self.instance.car_ownership = 0
+                            data['batteries']['car_ownership'] = 0
+                        data['batteries']['Cess_thresh_low'] = int(payload['home_batteries']['Cess_thresh_low'])/100
+                        data['batteries']['Cess_thresh_high'] = int(payload['home_batteries']['Cess_thresh_high'])/100
                         code = code*self.databaseClient.update_documents('home_configuration', {'_id':3}, data)
-
                         data = self.databaseClient.read_documents(collection_name='home_configuration', document={'_id':7})
-                        data['time']['time_dep'] = payload['EV']['Time_departure']
-
+                        try:
+                            data['time']['time_dep'] = payload['EV']['Time_departure']
+                        except:
+                            pass
                         # None -> for not having the car
                         code = code*self.databaseClient.update_documents('home_configuration', {'_id':7}, data)
-
                         # appliances:[modello, lavatrice-lavastovigle-vacuum cliner]
                         fp = open('./files/appliances_info.json')
                         cfg = json.load(fp)
                         fp.close()
                         data = self.databaseClient.read_documents(collection_name='home_configuration', document={'_id':4})
-
                         for i in payload['applianceData']:
-                            if i['name'] != 'washing_machine' or i['name'] != 'dishwasher' or i['name'] != 'vacuum_cleaner':
+                            if i['name'] == 'none':
+                                pass
+                            elif i['name'] != 'washing_machine' and i['name'] != 'dishwasher' and i['name'] != 'vacuum_cleaner':
                                 data['appliances']['N_sched_appliances'] += 1
                                 data['appliances']['sched_appliances']['name'].append('other')
-                                running_len = i['running_len']
+                                running_len = int(i['running_len'])
                                 running_len = int(running_len/self.time_granularity)
                                 data['appliances']['sched_appliances']['running_len'].append(running_len)
                                 data['appliances']['sched_appliances']['num_cycles'].append(1)
@@ -907,13 +918,12 @@ class SHEMS_main():
                             else:
                                 data['appliances']['N_sched_appliances'] += 1
                                 data['appliances']['sched_appliances']['name'].append(i['name'])
-                                data['appliances']['sched_appliances']['running_len'].append(cfg[i['name']]['running_len'])
-                                data['appliances']['sched_appliances']['num_cycles'].append(cfg[i['name']]['num_cycles'])
-                                data['appliances']['sched_appliances']['power_cons'].append(cfg[i['name']]['power_cons'])
+                                data['appliances']['sched_appliances']['running_len'].append(int(cfg[i['name']]['running_len']))
+                                data['appliances']['sched_appliances']['num_cycles'].append(int(cfg[i['name']]['num_cycles']))
+                                data['appliances']['sched_appliances']['power_cons'].append(float(cfg[i['name']]['power_cons']))
                                 data['appliances']['sched_appliances']['c1'].append(cfg[i['name']]['c1'])
                                 data['appliances']['sched_appliances']['c2'].append(cfg[i['name']]['c2'])
                         code = code*self.databaseClient.update_documents('home_configuration', {'_id':4}, data)
-
                         if code == 1:
                             self.__append_data(code=timestamp, data={'response':'New user registration success'})
                             logging.info('New registration success')
@@ -935,34 +945,37 @@ class SHEMS_main():
                         logging.error('New user registration failed')
 
                     self.__clear_file(self.commands_path, timestamp)
-                elif self.model == False:
-                    logging.warning('SHEMS model not active')
-                    payload = {'message':'SHEMS model not active'}
-                    fp = open(self.push_path, 'w')
-                    json.dump(payload, fp)
-                    fp.close()
+                    if self.model == False:
+                        logging.warning('SHEMS model not active')
+                        payload = {'message':'SHEMS model not active'}
+                        fp = open(self.push_path, 'w')
+                        json.dump(payload, fp)
+                        fp.close()
         except:
             logging.error('User command reading or execution error')
 
-    def __clear_file(self, path, timestmap=None):
+    def __clear_file(self, path, timestamp=None):
         try:
             fp = open(path)
             file = json.load(fp)
             fp.close
 
-            if timestmap != None:
+            if timestamp != None:
                 if path == self.commands_path:
-                    for c in range(file['command_list']):
-                        if file['command_list'][c]['timestamp'] == timestmap:
-                            file['command_list'].remove(c)    
+                    for c in range(len(file['commands_list'])):
+                        if file['commands_list'][c]['timestamp'] == timestamp:
+                            try:
+                                file['commands_list'].pop(c)
+                            except:
+                                print('non riesco')
                 elif path == self.data_path:
-                    del file['responses'][timestmap]    
+                    del file['responses'][timestamp]    
             else:
                 if path == self.commands_path: file = {"commands_list":[]}
                 elif path == self.data_path: file = {"responses":{}}
 
-            fp = open(path, 'w')
-            json.dump(file)
+            with open(path, 'w') as outfile:
+                json.dump(file, outfile)
 
             logging.info('GUI_thread_commands.json cleaned')
         except:

@@ -8,11 +8,11 @@ from django.db import DatabaseError
 from django.http.response import HttpResponse
 from django.shortcuts import render
 
-fp = open("./files/starting_configuration.json")
+fp = open('C:/Users/davide.brusco/Documents/Coding/SHEMS/SHEMS_project/SHEMS_venv/SHEMS_project/central_unit/files/starting_configuration.json')
 data = json.load(fp)
 fp.close()
-commands_path = data['webServer_command_path']
-data_path = data['webServer_data_path']
+commands_path = data['webserver_commands_path']
+data_path = data['webserver_data_path']
 
 def __append_commands(command, flag_payload, payload=None):
     """Once a command is recevied from HTTP protocol, it is written in the GUI_thread_command.json file
@@ -33,7 +33,10 @@ def __append_commands(command, flag_payload, payload=None):
     commands = ['home', 'appliances', 'scheduling', 'changeScheduling', 'summary', 'settings', 'communityPlots', 'communityProsumers', 'registration', 'listDevice', 'oldParameters']
     if command in commands:
         try:
+
+
             fp = open(commands_path)
+
             file = json.load(fp)
             fp.close()
 
@@ -104,6 +107,7 @@ def home(request):
     s = time.time()
     code = __append_commands(command='home', flag_payload=False)
     data = __read_data(code=code)
+    print(data)
     e = time.time()
     logging.info(f'"home" timing {s-e}')
     return HttpResponse(str(data))
@@ -119,6 +123,7 @@ def scheduling(request):
     s = time.time()
     code = __append_commands(command='scheduling', flag_payload=False)
     data = __read_data(code=code)
+    print(data)
     e = time.time()
     logging.info(f'"scheduling" timing {s-e}')
     return HttpResponse(str(data))
@@ -134,6 +139,7 @@ def listDevice(request):
     s = time.time() 
     code = __append_commands(command='listDevice', flag_payload=False)
     data = __read_data(code=code)
+    print(data)
     e = time.time()
     logging.info(f'"listDevice" timing {s-e}')
     return HttpResponse(str(data))
@@ -160,6 +166,7 @@ def changeScheduling(request):
         payload['appliance'] = data['which']
         code = __append_commands(command='changeScheduling', flag_payload=True, payload=payload)
         data = __read_data(code=code)
+        print(data)
         e = time.time()
         logging.info(f'"changeScheduling" timing {s-e}')
         return HttpResponse(str(data))
@@ -183,6 +190,7 @@ def summary(request):
         payload['appliance'] = request.GET['object']
         code = __append_commands(command='summary', flag_payload=True, payload=payload)
         data = __read_data(code=code)
+        print(data)
         e = time.time()
         logging.info(f'"summary" timing {s-e}')
         return HttpResponse(str(data))
@@ -201,6 +209,7 @@ def oldParameters(request):
     s = time.time()
     code = __append_commands(command='oldParameters', flag_payload=False)
     data = __read_data(code=code)
+    print(data)
     e = time.time()
     logging.info(f'"oldParameters" timing {s-e}')
     return HttpResponse(str(data))
@@ -228,6 +237,7 @@ def settings(request):
             payload['new_values'] = data['new_values']
             code = __append_commands(command='changeSetpoints', flag_payload=True, payload=payload)
             data = __read_data(code=code)
+            print(data)
             e = time.time()
             logging.info(f'"settings" timing {s-e}')
             return HttpResponse(str(data))
@@ -252,6 +262,7 @@ def settings(request):
             """
             code = __append_commands(command='addAppliances', flag_payload=True, payload=payload)
             data = __read_data(code=code)
+            print(data)
             e = time.time()
             logging.info(f'"settings" timing {s-e}')
             return HttpResponse(str(data))
@@ -265,6 +276,7 @@ def settings(request):
             payload = data['applianceData']
             data = __append_commands(command='delete_appliances', flag_payload=True, payload=payload)
             data = __read_data(code=code)
+            print(data)
             e = time.time()
             logging.info(f'"settings" timing {s-e}')
             return HttpResponse(str(data))
@@ -289,11 +301,12 @@ def communityPlots(request):
         payload['which'] = request.GET['object']
         code = __append_commands(command='community', flag_payload=True, payload=payload)
         data = __read_data(code=code)
+        print(data)
         e = time.time()
         logging.info(f'"communityPlots" timing {s-e}')
         return HttpResponse(str(data))
     except:
-        logging.error('Error "period" or "object" field missing - communityPlots request')
+        logging.error('"period" or "object" field missing - communityPlots request')
         return HttpResponse(str({'message':'Error "period" or "object" field missing'}))
 
 def communityProsumers(request):
@@ -307,6 +320,7 @@ def communityProsumers(request):
     s = time.time()
     code = __append_commands(command='community', flag_payload=True)
     data = __read_data(code=code)
+    print(data)
     e = time.time()
     logging.info(f'"communityProsumer" timing {s-e}')
     return HttpResponse(str(data))
@@ -336,6 +350,7 @@ def registration(request):
 
         code = __append_commands(command='registration', flag_payload=True, payload=payload)
         data = __read_data(code=code)
+        print(data)
         e = time.time()
         logging.info(f'"registration" timing {s-e}')
         return HttpResponse(str(data))

@@ -14,5 +14,7 @@
     "commands_path":"./files/GUI_thread_commands.json",
     "data_path":"./files/GUI_thread_data.json",
     "push_path": "./files/push_notification.json",
+    "webserver_data_path":"C:/Users/davide.brusco/Documents/Coding/SHEMS/SHEMS_project/SHEMS_venv/SHEMS_project/central_unit/files/GUI_thread_data.json",
+    "webserver_commands_path":"C:/Users/davide.brusco/Documents/Coding/SHEMS/SHEMS_project/SHEMS_venv/SHEMS_project/central_unit/files/GUI_thread_commands.json",
     "websocket_topic": "websocket_topic"
 }

@@ -12,6 +12,14 @@ frontend side:
     # s is a string
     d = json.loads(s) # in python should be something similar in javascript idk
 
+
+
+
+
+
+
+
+
 3.registration:
 - the EV dictionary is empty, only that one. .SHEMS_webserver/views.py line 387 i recover the dictionary,
 line 391 i print it but it is empty
@@ -26,9 +34,10 @@ in the folder ./info/scheduling_test.json
 5. summary.. i don't understand if it is working or not, i need to prepare a file with all the data stored if not the system 
 find some erros due to lack of data
 
-EV_battery, ESS_battery wrong url
+EV_battery, ESS_battery wrong url summary2/
 
 8. community... i don't understand if it is owkring or not, i need to prepare a file like in the summary case
+wrong url /plot, correct url community/plots ... prosumers
 
 9. old parameters has a bug.. idk why but the request is performed and it shoudl work but the system dosn't clean the commadns file:
 i put a counter that after three times force the cleaninig and send to the user an advice.
@@ -36,10 +45,17 @@ I need to insert also famili name in old parameters, i will do it this afternnon
 
 the info disappear... 
 
-addAppliances format wrong
-delete appliances?
-changeSetpoints.... dead?
+addAppliances 
+{
+    action: ...
+    applianceData: {
+        name 
+        ...
+    }
+}
+delete appliances ... no present ... check after GET problem fixed
+changeSetpoints... no request or wrong?
 
-suggestion: can we put a message that notify the user that the system is loading
+last point!!!
 suggestion: have we got control about the data that are inserted by the user ... 
 what happend if the user insert 1000 °C as temperature? or if the minimum battery level is higher than the biggest one

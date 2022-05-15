@@ -1,6 +1,7 @@
 import json
 import logging
 import numpy as np
+from datetime import datetime
 
 from utilities.mqttclient import MQTTPublisher, MQTTSubscriber
 from utilities.timer import perpetualTimer
@@ -160,17 +161,18 @@ if __name__ == '__main__':
     for i in range(n):
         appliances.append(generalAppliances_subscriber(cfg))
 
-    # 60*60*8 every 8 hours
-    #EV_timer = perpetualTimer(t=, hFunction=EV.EV_notify) 
-    #EV_timer.start()
-
-    # 60*60*7 every 7 hours
-    #HW_timer = perpetualTimer(t=, hFunction=HW.HW_notify)
-    #HW_timer.start()
-
-    # 8 a.m.   24*60*60 every day
-    SM = perpetualTimer(t=24*60*60, hFunction=SM.RTP_notify)
-    SM.start()
+    SM_flag = True
 
     while True:
-        pass
+        now = datetime.now()
+        if now.strftime("%H:%M") == "08:00" and SM_flag:
+            # 8 a.m.   24*60*60 every day
+            SM = perpetualTimer(t=24*60*60, hFunction=SM.RTP_notify)
+            SM.start()
+            SM_flag = False
+
+        #EV_timer = perpetualTimer(t=, hFunction=EV.EV_notify) 
+        #EV_timer.start()
+
+        #HW_timer = perpetualTimer(t=, hFunction=HW.HW_notify)
+        #HW_timer.start()          

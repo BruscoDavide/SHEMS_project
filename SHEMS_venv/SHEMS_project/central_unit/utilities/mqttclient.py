@@ -89,7 +89,7 @@ class MQTTSubscriber():
             topic (string): topic of the communication
         """
         self._topic = topic
-        logging.info(f'CLient {self._clientID} subscribing to {self._topic} topic')
+        logging.info(f'Client {self._clientID} subscribing to {self._topic} topic')
         self._paho_mqtt.subscribe(topic, 0) 
 
     def stop (self): 

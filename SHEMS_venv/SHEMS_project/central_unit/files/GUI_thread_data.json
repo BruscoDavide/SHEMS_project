@@ -1,1 +1,1 @@
-{"responses": {"2022-05-14 22:10:40": {"oldParameters": {"Tin_max": 23, "Tin_min": 19, "Tewh_max": 50, "Tewh_min": 45, "Cess_thresh_low": 0.1, "Cess_thresh_high": 0.9, "Cpev_thresh_low": 0.2, "Cpev_thresh_high": 0.8, "Time_deperature": "08:00"}}}}
+{"responses": {"2022-05-15 09:58:01": {"oldParameters": {"Tin_max": 23, "Tin_min": 19, "Tewh_max": 50, "Tewh_min": 45, "Cess_thresh_low": 0.15, "Cess_thresh_high": 0.9, "Cpev_thresh_low": 0.2, "Cpev_thresh_high": 0.8, "Time_deperature": "08:00"}}}}

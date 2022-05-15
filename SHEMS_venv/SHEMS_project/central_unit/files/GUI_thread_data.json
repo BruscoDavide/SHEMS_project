@@ -1,1 +1,1 @@
-{"responses": {"2022-05-15 09:58:01": {"oldParameters": {"Tin_max": 23, "Tin_min": 19, "Tewh_max": 50, "Tewh_min": 45, "Cess_thresh_low": 0.15, "Cess_thresh_high": 0.9, "Cpev_thresh_low": 0.2, "Cpev_thresh_high": 0.8, "Time_deperature": "08:00"}}}}
+{"responses": {"2022-05-15 19:11:20": {"listDevices": [], "single_values": {"ESS_battery": 5.12877133041461, "EV_battery": 0.0, "consumption": 2.0173574691666634}}}}

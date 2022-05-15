@@ -72,7 +72,7 @@ def __read_data(code):
     logging.info('__read_data')
     flag = True
     c = 0
-    t = 10000000  # tested
+    t = 1000000  # tested
 
     while flag:
         try:
@@ -83,9 +83,13 @@ def __read_data(code):
             response = file['responses'][str(code)]
             del file['responses'][str(code)]
             flag = False
-
+            
             fp = open(data_path, 'w')
-            json.dump(file, fp)
+            if len(file['responses']) > 3:
+                file = {'responses':{}}
+                json.dump(file, fp)
+            else:
+                json.dump(file, fp)
             fp.close()
 
             break
@@ -93,6 +97,7 @@ def __read_data(code):
             c += 1
             if c == t:
                 flag = False
+    
     if c == t:
         logging.error('Command request cannot be satisfy: error "code" or "main.py" offline')
         return {'response': 'Command request cannot be satisfy: error "code" or "main.py" offline'}
@@ -273,6 +278,7 @@ def settings(request):
 
     elif data['action'] == 'addAppliances':
         try:
+            logging.info(data)
             payload = {}
             payload = data['applianceData']
             """

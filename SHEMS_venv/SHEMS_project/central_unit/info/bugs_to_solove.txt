@@ -16,7 +16,7 @@ frontend side:
 - the EV dictionary is empty, only that one. .SHEMS_webserver/views.py line 387 i recover the dictionary,
 line 391 i print it but it is empty
 
-4. home dosn't show the data provided by the system??, some icons sometimes doesn' appear??
+4. home dosn't show the data provided by the system??
 
 5. schduling has a long list of icons. From my side i can see the data, there is an example of what i provide to you 
 in the folder ./info/scheduling_test.json
@@ -26,13 +26,19 @@ in the folder ./info/scheduling_test.json
 5. summary.. i don't understand if it is working or not, i need to prepare a file with all the data stored if not the system 
 find some erros due to lack of data
 
+EV_battery, ESS_battery wrong url
+
 8. community... i don't understand if it is owkring or not, i need to prepare a file like in the summary case
 
 9. old parameters has a bug.. idk why but the request is performed and it shoudl work but the system dosn't clean the commadns file:
 i put a counter that after three times force the cleaninig and send to the user an advice.
 I need to insert also famili name in old parameters, i will do it this afternnon is avery quick operation
 
-I need also to test deleteAplliance, change setpoints and addAppliances.. i will do it in the afternoon or before lunch
+the info disappear... 
+
+addAppliances format wrong
+delete appliances?
+changeSetpoints.... dead?
 
 suggestion: can we put a message that notify the user that the system is loading
 suggestion: have we got control about the data that are inserted by the user ... 

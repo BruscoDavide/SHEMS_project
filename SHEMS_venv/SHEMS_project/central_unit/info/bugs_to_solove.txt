@@ -2,8 +2,7 @@ davide:
 - change scheduling: 
 mi dice che l'ha fatto ma poi non l'ha fatto, verifico poi con scheduling
 ma magari è anche aggiornato il Phouse_consume anzi sicuramente però non lo è lo scehduling...infatti io non lo faccio!
-- error data enough when summary asks for too much data
-- afer tot if the request is not solved clean the commands and data files - command GUI (append data) not working sometimes, with addAppliances never
+
 **bugs
 - c'è un bug a riga 201 di main.py
 - old parameters has a bug.. idk why but the request is performed and it shoudl work but the system dosn't clean the commadns file:

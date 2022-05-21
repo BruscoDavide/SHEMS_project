@@ -388,11 +388,16 @@ class SHEMS_main():
                             data['single_values']['ESS_battery'] = self.shems.Cess[step]
                             data['single_values']['EV_battery'] = self.shems.Cpev[step]
                             data['single_values']['consumption'] = self.shems.Phouse_consume[step]
+                            data['responseFlag'] = 'True'
 
                             self.__append_data(code=timestamp, data=data)
 
                             logging.info('"Home" GET request performed')
                         except:
+                            data = {}
+                            data['message'] = '"Home" GET request failed'
+                            data['responseFlag'] = 'False'
+                            self.__append_data(code=timestamp, data=data)
                             logging.error('"Home" GET request failed')
 
                     elif c['command'] == 'scheduling' and self.model:
@@ -542,11 +547,17 @@ class SHEMS_main():
                                     ob['consumption'] += self.shems.Pewh_out[i]/(60/self.time_granularity)
                             
                             data['scheduling'].append(ob)
+                            data['responseFlag'] = 'True'
 
                             self.__append_data(code=timestamp, data=data)
 
                             logging.info('"Scheduling" GET request performed')
                         except:
+                            data = {}
+                            data['message'] = '"Shceduling" GET request failed'
+                            data['responseFlag'] = 'False'
+                            self.__append_data(code=timestamp, data=data)
+
                             logging.error('"Shceduling" GET request failed')
 
                     elif c['command'] == 'listDevice':
@@ -555,11 +566,16 @@ class SHEMS_main():
                             info = self.databaseClient.read_documents(collection_name='home_configuration', document={'_id': 4})
                             data = {}
                             data['listDevices'] = info['appliances']['sched_appliances']['name']
-
+                            data['responseFlag'] = 'True'
                             self.__append_data(code=timestamp, data=data)
 
                             logging.info('"listDevice" GET request performed')
                         except:
+                            data = {}
+                            data['message'] = '"listDevice" GET request failed'
+                            data['responseFlag'] = 'False'
+                            self.__append_data(code=timestamp, data=data)
+
                             logging.error('"listDevice" GET request failed')
 
                     elif c['command'] == 'changeScheduling' and self.model:
@@ -576,15 +592,25 @@ class SHEMS_main():
 
                             if cod == 2:
                                 self.__historyData_saving(step)
-
-                                self.__append_data(code=timestamp, data={'response': 'Changing scheduling performed, new scheduling'})
+                                data = {}
+                                data['responseFlag'] = 'False'
+                                data['message'] = 'Changing scheduling performed, new scheduling'
+                                self.__append_data(code=timestamp, data=data)
                                 logging.info('Changing scheduling performed')
                             elif cod == -1:
-                                self.__append_data(code=timestamp, data={'response': 'Changing schedluinig failed, no new scheduling'})
+                                data = {}
+                                data['responseFlag'] = 'False'
+                                data['message'] = 'Changing schedluinig failed, no new scheduling'
+                                self.__append_data(code=timestamp, data=data)
                                 logging.info('Changing scheduling failed, no new scheduling')
 
                             logging.info('"changeSchduling" POST request performed')
                         except:
+                            data = {}
+                            data['message'] = '"changeSchduling" POST request failed'
+                            data['responseFlag'] = 'False'
+                            self.__append_data(code=timestamp, data=data)
+
                             logging.error('"changeSchduling" POST request failed')
 
                     elif c['command'] == 'summary':
@@ -620,6 +646,8 @@ class SHEMS_main():
                                         requiredData['max'] = max
                                     except:
                                         logging.info('Not enough data to solve the request')
+                                        requiredData['message'] = 'Not enough data to solve the request'
+                                        requiredData['responseFlag'] = 'False'
 
                                 elif payload['start_time'] == 'week':
                                     try:
@@ -644,6 +672,8 @@ class SHEMS_main():
                                         requiredData['max'] = max
                                     except:
                                         logging.info('Not enough data to solve the request')
+                                        requiredData['message'] = 'Not enough data to solve the request'
+                                        requiredData['responseFlag'] = 'False'
 
                                 elif payload['start_time'] == 'month':
                                     try:
@@ -662,6 +692,8 @@ class SHEMS_main():
                                         requiredData['max'] = max
                                     except:
                                         logging.info('Not enough data to solve the request')
+                                        requiredData['message'] = 'Not enough data to solve the request'
+                                        requiredData['responseFlag'] = 'False'
 
                                 elif payload['start_time'] == 'year':
                                     try:
@@ -680,6 +712,8 @@ class SHEMS_main():
                                         requiredData['max'] = max
                                     except:
                                         logging.info('Not enough data to solve the request')
+                                        requiredData['message'] = 'Not enough data to solve the request'
+                                        requiredData['responseFlag'] = 'False'
 
                             elif payload['appliance'] == 'EV_battery':
                                 try:
@@ -704,6 +738,8 @@ class SHEMS_main():
                                     requiredData['max'] = max
                                 except:
                                         logging.info('Not enough data to solve the request')
+                                        requiredData['message'] = 'Not enough data to solve the request'
+                                        requiredData['responseFlag'] = 'False'
 
                             elif payload['appliance'] == 'ESS_battery':
                                 try:
@@ -729,6 +765,9 @@ class SHEMS_main():
 
                                 except:
                                         logging.info('Not enough data to solve the request')
+                                        requiredData['message'] = 'Not enough data to solve the request'
+                                        requiredData['responseFlag'] = 'False'
+
                             if self.instance.car_ownership == 1: requiredData['EV_flag'] = 'True'
                             else: requiredData['EV_flag'] = 'False'
                             self.__append_data(code=timestamp, data=requiredData)
@@ -759,11 +798,15 @@ class SHEMS_main():
 
                             if self.instance.car_ownership == 1: data['new_values']['EV_flag'] = 'True'
                             else: data['new_values']['EV_flag'] = 'False'
+                            data['responseFlag'] = 'True'
                             self.__append_data(code=timestamp, data=data)
 
-                            logging.info(
-                                '"oldParameters" GET request performed')
+                            logging.info('"oldParameters" GET request performed')
                         except:
+                            data = {}
+                            data['responseFlag'] = 'True'
+                            data['message'] = '"oldParameters" GET request failed'
+                            
                             logging.error('"oldParameters" GET request failed')
 
                     elif c['command'] == 'changeSetpoints' and self.model:
@@ -789,13 +832,6 @@ class SHEMS_main():
                         data['time']['time_dep'] = payload['oldParameters']['time_dep']
                         code = code*self.databaseClient.update_documents(collection_name='time', document={'_id': 7}, data=data)
 
-                        if code == 1:
-                            self.__append_data(code=timestamp, data={'response': 'Updating setpoints success'})
-                            logging.info('Updating setpoints success')
-                        else:
-                            self.__append_data(code=timestamp, data={'response': ' user Updating setpoints failed'})
-                            logging.error('Updating setpoints failed')
-
                         payload['command'] = 0
                         payload['start_time'] = []
                         del payload['new_value']
@@ -805,14 +841,30 @@ class SHEMS_main():
 
                         self.shems.set_working_mode(payload)
                         cod = self.shems.solve_definitive()
-
-                        if cod == 2:
-                            self.__append_data(code=timestamp, data={'response': 'Updating setpoint performed, new scheduling'})
-                            self.__historyData_saving(step)
-                            logging.info('New scheduling performed')
-                        elif cod == -1:
-                            self.__append_data(code=timestamp, data={'response': 'New scheduling failed'})
-                            logging.error('New scheduling failed')
+                        
+                        if code == 1:
+                            #self.__append_data(code=timestamp, data={'response': 'Updating setpoints success'})
+                            logging.info('Updating setpoints success')
+                            if cod == 2:
+                                data = {}
+                                data['message'] = 'Updating setpoint performed, new scheduling'
+                                data['responseFlag'] = 'False'
+                                self.__append_data(code=timestamp, data=data)
+                                self.__historyData_saving(step)
+                                logging.info('New scheduling performed')
+                            elif cod == -1:
+                                data = {}
+                                data['message'] = 'New scheduling failed'
+                                data['responseFlag'] = 'False'
+                                self.__append_data(code=timestamp, data=data)
+                                logging.error('New scheduling failed')
+                        else:
+                            #self.__append_data(code=timestamp, data={'response': ' user Updating setpoints failed'})
+                            data = {}
+                            data['message'] = 'Updating setpoints failed'
+                            data['responseFlag'] = 'False'
+                            self.__append_data(code=timestamp, data=data)
+                            logging.error('Updating setpoints failed')
 
                     elif c['command'] == 'addAppliances' and self.model:
                         logging.info('GUI_thread_callback-addAppliances')
@@ -842,8 +894,6 @@ class SHEMS_main():
                             data['appliances']['sched_appliances']['c1'].append(cfg[payload['applianceData']]['c1'])
                             data['appliances']['sched_appliances']['c2'].append(cfg[payload['applianceData']]['c2'])
                         code = self.databaseClient.update_documents(collection_name='home_configuration', document={'_id': 4}, data=data)
-                        if code == 1: logging.info('Data updated')
-                        else: logging.error('Database failed')
 
                         del payload['applianceData']
                         payload['command'] = 2
@@ -855,13 +905,27 @@ class SHEMS_main():
 
                         self.shems.set_working_mode(payload)
                         cod = self.shems.solve_definitive()
-                        if cod == 2:
-                            self.__historyData_saving(step)
-                            self.__append_data(code=timestamp, data={ 'response': 'Updating appliances list performed, new scheduling'})
-                            logging.info("addAppliances request performed")
-                        elif cod == -1:
-                            self.__append_data(code=timestamp, data={'response': 'Updating appliances list failed, no new scheduling'})
-                            logging.error('Updating appliances list failed, no new scheduling')
+                        if code == 1:
+                            logging.info('Data updated')
+                            if cod == 2:
+                                data = {}
+                                data['message'] = 'Updating appliances list performed, new scheduling'
+                                data['responseFlag'] = 'False'
+                                self.__historyData_saving(step)
+                                self.__append_data(code=timestamp, data=data)
+                                logging.info("addAppliances request performed")
+                            elif cod == -1:
+                                data = {}
+                                data['message'] = 'Updating appliances list failed, no new scheduling'
+                                data['responseFlag'] = 'False'
+                                self.__append_data(code=timestamp, data=data)
+                                logging.error('Updating appliances list failed, no new scheduling')
+                        else:
+                            data = {}
+                            data['message'] = 'Database failed, no appliance addition'
+                            data['responseFlag'] = 'False'
+                            self.__append_data(code=timestamp, data=data)
+                            logging.error('Database failed')
 
                     elif c['command'] == 'deleteAppliances' and self.model:
                         logging.info('GUI_thread_callback-deleteAppliances')
@@ -878,8 +942,6 @@ class SHEMS_main():
                                 data['appliances']['sched_appliances']['c1'].pop(i)
                                 data['appliances']['sched_appliances']['c2'].pop(i)
                                 code = self.databaseClient.update_documents(collection_name='home_configuration', document={'_id': 4}, data=data)
-                                if code == 1: logging.info('Data updated')
-                                else: logging.error('Database failed')
 
                                 del payload['applianceData']
                                 payload['command'] = 2
@@ -891,14 +953,34 @@ class SHEMS_main():
 
                                 self.shems.set_working_mode(payload)
                                 cod = self.shems.solve_definitive()
-                                if cod == 2:
-                                    self.__historyData_saving(step)
-                                    self.__append_data(code=timestamp, data={'response': 'Updating appliances list success, new scheduling'})
-                                    logging.info('"deleteAppliances request performed')
-                                elif cod == -1:
-                                    self.__append_data(code=timestamp, data={'response': 'Updating appliances list failed, no new scheduling'})
-                                    logging.info('Updating appliances list failed')
+
+                                if code == 1: 
+                                    logging.info('Data updated')
+                                    if cod == 2:
+                                        self.__historyData_saving(step)
+                                        data = {}
+                                        data['message'] = 'Updating appliances list success, new scheduling'
+                                        data['responseFlag'] = 'False'
+                                        self.__append_data(code=timestamp, data=data)
+                                        logging.info('"deleteAppliances request performed')
+                                    elif cod == -1:
+                                        data = {}
+                                        data['message'] = 'Updating appliances list failed, no new scheduling'
+                                        data['responseFlag'] = 'False'
+                                        self.__append_data(code=timestamp, data=data)
+                                        logging.info('Updating appliances list failed')
+                                else: 
+                                    data = {}
+                                    data['message'] = 'Database failed, no appliance elimination'
+                                    data['responseFlag'] = 'False'
+                                    self.__append_data(code=timestamp, data=data)
+                                    logging.error('Database failed')
+
                             else:
+                                data = {}
+                                data['message'] = 'Wrong name or not found, no appliance elimination'
+                                data['responseFlag'] = 'False'
+                                self.__append_data(code=timestamp, data=data)
                                 logging.warning('Error appliances name wrong, not found')
 
                     elif c['command'] == 'communityPlots':
@@ -909,89 +991,116 @@ class SHEMS_main():
                             requiredData = []
 
                             if payload['when'] == 'day':
-                                values = []
-                                xlabel = []
-                                min = 999999
-                                max = -999999
-                                m = 0
-                                for i in range(24):
-                                    s = 0
-                                    for j in range(self.time_granularity):
-                                        s += data[payload['which']][j*i]
+                                try:
+                                    values = []
+                                    xlabel = []
+                                    min = 999999
+                                    max = -999999
+                                    m = 0
+                                    for i in range(24):
+                                        s = 0
+                                        for j in range(self.time_granularity):
+                                            s += data[payload['which']][j*i]
 
-                                    values.append(s/(60/self.time_granularity))
-                                    xlabel.append(i*self.time_granularity/60) # this labels consider the day starting from 8
-                                    if s/(60/self.time_granularity) > max: max = s/(60/self.time_granularity)
-                                    if s/(60/self.time_granularity) < min: min = s/(60/self.time_granularity)
-                                    m += s/(60/self.time_granularity)
-                                requiredData['data'] = values  # values
-                                requiredData['label'] = xlabel  # xlabel
-                                requiredData['mean'] = m/24
-                                requiredData['min'] = min
-                                requiredData['max'] = max
+                                        values.append(s/(60/self.time_granularity))
+                                        xlabel.append(i*self.time_granularity/60) # this labels consider the day starting from 8
+                                        if s/(60/self.time_granularity) > max: max = s/(60/self.time_granularity)
+                                        if s/(60/self.time_granularity) < min: min = s/(60/self.time_granularity)
+                                        m += s/(60/self.time_granularity)
+                                    requiredData['data'] = values  # values
+                                    requiredData['label'] = xlabel  # xlabel
+                                    requiredData['mean'] = m/24
+                                    requiredData['min'] = min
+                                    requiredData['max'] = max
+                                    requiredData['responseFlag'] = 'True'
+                                except:
+                                    logging.info('Not enough data to solve the request')
+                                    requiredData['message'] = 'Not enough data to solve the request'
+                                    requiredData['responseFlag'] = 'False'
 
                             elif payload['when'] == 'week':
-                                values = []
-                                xlabel = []
-                                min = 999999
-                                max = -999999
-                                m = 0
-                                for i in range(7):
-                                    s = 0
-                                    for j in range(24*self.time_granularity):
-                                        s += data[payload['which']][j*i]
+                                try:
+                                    values = []
+                                    xlabel = []
+                                    min = 999999
+                                    max = -999999
+                                    m = 0
+                                    for i in range(7):
+                                        s = 0
+                                        for j in range(24*self.time_granularity):
+                                            s += data[payload['which']][j*i]
 
-                                    values.append(s/(24*(60/self.time_granularity)))
-                                    xlabel.append(i*(self.time_granularity*24)) # this labels consider the day starting from 8
-                                    if s/(24*(60/self.time_granularity)) > max: max = s/(24*(60/self.time_granularity))
-                                    if s/(24*(60/self.time_granularity)) < min: min = s/(24*(60/self.time_granularity))
-                                    m += s/(24*(60/self.time_granularity))
-                                requiredData['data'] = values  # values
-                                requiredData['label'] = xlabel  # xlabel
-                                requiredData['mean'] = m/7
-                                requiredData['min'] = min
-                                requiredData['max'] = max
+                                        values.append(s/(24*(60/self.time_granularity)))
+                                        xlabel.append(i*(self.time_granularity*24)) # this labels consider the day starting from 8
+                                        if s/(24*(60/self.time_granularity)) > max: max = s/(24*(60/self.time_granularity))
+                                        if s/(24*(60/self.time_granularity)) < min: min = s/(24*(60/self.time_granularity))
+                                        m += s/(24*(60/self.time_granularity))
+                                    requiredData['data'] = values  # values
+                                    requiredData['label'] = xlabel  # xlabel
+                                    requiredData['mean'] = m/7
+                                    requiredData['min'] = min
+                                    requiredData['max'] = max
+                                    requiredData['responseFlag'] = 'True'
+                                except:
+                                    logging.info('Not enough data to solve the request')
+                                    requiredData['message'] = 'Not enough data to solve the request'
+                                    requiredData['responseFlag'] = 'False'
 
                             elif payload['when'] == 'month':
-                                values = []
-                                xlabel = []
-                                min = 999999
-                                max = -999999
-                                m = 0
-                                for i in range(7*4):
-                                    s = 0
-                                    for j in range(int(24*(60/self.time_granularity))):
-                                        s += data[payload['which']][j*i]
+                                try:
+                                    values = []
+                                    xlabel = []
+                                    min = 999999
+                                    max = -999999
+                                    m = 0
+                                    for i in range(7*4):
+                                        s = 0
+                                        for j in range(int(24*(60/self.time_granularity))):
+                                            s += data[payload['which']][j*i]
 
-                                    if s/(24*(60/self.time_granularity)) > max: max = s/(24*(60/self.time_granularity))
-                                    if s/(24*(60/self.time_granularity)) < min: min = s/(24*(60/self.time_granularity))
-                                    m += s/(24*(60/self.time_granularity))
-                                requiredData['mean'] = m/7
-                                requiredData['min'] = min
-                                requiredData['max'] = max
+                                        if s/(24*(60/self.time_granularity)) > max: max = s/(24*(60/self.time_granularity))
+                                        if s/(24*(60/self.time_granularity)) < min: min = s/(24*(60/self.time_granularity))
+                                        m += s/(24*(60/self.time_granularity))
+                                    requiredData['mean'] = m/7
+                                    requiredData['min'] = min
+                                    requiredData['max'] = max
+                                    requiredData['responseFlag'] = 'True'
+                                except:
+                                    logging.info('Not enough data to solve the request')
+                                    requiredData['message'] = 'Not enough data to solve the request'
+                                    requiredData['responseFlag'] = 'False'
 
                             elif payload['when'] == 'year':
-                                values = []
-                                xlabel = []
-                                min = 999999
-                                max = -999999
-                                m = 0
-                                for i in range(7*4*12):
-                                    s = 0
-                                    for j in range(int(24*(60/self.time_granularity))):
-                                        s += data[payload['which']][j*i]
+                                try:
+                                    values = []
+                                    xlabel = []
+                                    min = 999999
+                                    max = -999999
+                                    m = 0
+                                    for i in range(7*4*12):
+                                        s = 0
+                                        for j in range(int(24*(60/self.time_granularity))):
+                                            s += data[payload['which']][j*i]
 
-                                    if s/(24*(60/self.time_granularity)) > max: max = s/(24*(60/self.time_granularity))
-                                    if s/(24*(60/self.time_granularity)) < min: min = s/(24*(60/self.time_granularity))
-                                    m += s/(24*(60/self.time_granularity))
-                                requiredData['mean'] = m/7
-                                requiredData['min'] = min
-                                requiredData['max'] = max
-
+                                        if s/(24*(60/self.time_granularity)) > max: max = s/(24*(60/self.time_granularity))
+                                        if s/(24*(60/self.time_granularity)) < min: min = s/(24*(60/self.time_granularity))
+                                        m += s/(24*(60/self.time_granularity))
+                                    requiredData['mean'] = m/7
+                                    requiredData['min'] = min
+                                    requiredData['max'] = max
+                                    requiredData['responseFlag'] = 'True'
+                                except:
+                                    logging.info('Not enough data to solve the request')
+                                    requiredData['message'] = 'Not enough data to solve the request'
+                                    requiredData['responseFlag'] = 'False'
+                            
                             self.__append_data(code=timestamp, data=requiredData)
 
                             logging.info('"communityPlots" GET request performed')
                         except:
+                            data = {}
+                            data['message'] = 'communityPlots GET request failed'
+                            data['responseFlag'] = 'False'
                             logging.error('communityPlots GET request failed')
 
                     elif c['command'] == 'communityProsumers':
@@ -1028,11 +1137,14 @@ class SHEMS_main():
                                 ob['my_tot_price_sold'] += tot_price_sold
                                 ob['my_tot_price_bought'] += tot_price_bought
                                 requiredData.append(ob)
+                            requiredData['responseFlag'] = 'True'
 
                             self.__append_data(code=timestamp, data=requiredData)
-
                             logging.info('"communityProsumers" GET request performed')
                         except:
+                            data = {}
+                            data['message'] = '"communityProsumers" GET request failed'
+                            data['responseFlag'] = 'False'
                             logging.error('"communityProsumers" GET request failed')
 
                     elif c['command'] == 'registration':
@@ -1106,7 +1218,6 @@ class SHEMS_main():
 
                             code = code * self.databaseClient.update_documents('home_configuration', {'_id': 4}, data)
                             if code == 1:
-                                self.__append_data(code=timestamp, data={'response': 'New user registration success'})
                                 logging.info('New registration success')
 
                                 # first modelling computation after registration
@@ -1118,14 +1229,36 @@ class SHEMS_main():
                                     if cod == 2:
                                         self.model = True
                                         self.__historyData_saving()
+                                        
+                                        data = {}
+                                        data['message'] = 'New registration success, mathematical model active'
+                                        data['responseFlag'] = 'False'
+                                        self.__append_data(code=timestamp, data=data)
+                                        logging.error(f'New registration success, mathematical model active')
+                                    else:
+                                        data = {}
+                                        data['message'] = f'New registration success, mathematical model error, code = {cd}'
+                                        data['responseFlag'] = 'False'
+                                        self.__append_data(code=timestamp, data=data)
+                                        logging.error(f'New registration success, mathematical model unsolvable, code = {cd}')
                                 except:
-                                    logging.error(f'New user registration failed, mathematical model error, code = {cd}')
+                                    data = {}
+                                    data['message'] = f'New registration success, mathematical model error, code = {cd}'
+                                    data['responseFlag'] = 'False'
+                                    self.__append_data(code=timestamp, data=data)
+                                    logging.error(f'New registration success, mathematical model error, code = {cd}')
 
                             else:
-                                self.__append_data(code=timestamp, data={'response': 'New user registration failed, database error'})
+                                data = {}
+                                data['message'] = 'New user registration failed, database error'
+                                data['responseFlag'] = 'False'
+                                self.__append_data(code=timestamp, data=data)
                                 logging.error('New user registration failed, database error')
                         except:
-                            self.__append_data(code=timestamp, data={'response': 'New user registration failed'})
+                            data = {}
+                            data['message'] = 'New user registration failed'
+                            data['responseFlag'] = 'False'
+                            self.__append_data(code=timestamp, data=data)
                             logging.error('New user registration failed')
 
                         if self.model == False:
@@ -1175,7 +1308,8 @@ class SHEMS_main():
             self.c += 1
             if self.c > 3:
                 self.c = 0
-                self.__clear_file(path, None)
+                self.__clear_file(self.commands_path, None)
+                self.__clear_file(self.data_path, None)
                 
                 logging.warning('Cleaning files error: repeat the operation')
                 fp = open(self.push_path)
@@ -1275,8 +1409,7 @@ class SHEMS_main():
             data['energySold'] = []
             data['Pg_market'] = []
             data['prosumers'] = []
-            code = code*self.databaseClient.update_documents(
-                collection_name='data_collected', document={'_id': 'history'}, object=data)
+            code = code*self.databaseClient.update_documents(collection_name='data_collected', document={'_id': 'history'}, object=data)
             
             data = {}
             data['appliances'] = {}
@@ -1288,8 +1421,7 @@ class SHEMS_main():
             data['appliances']['sched_appliances']['num_cycles'] = []
             data['appliances']['sched_appliances']['c1'] = []
             data['appliances']['sched_appliances']['c2'] = []
-            code = code*self.databaseClient.update_documents(
-                collection_name='home_configuration', document={'_id': 4}, object=data)
+            code = code*self.databaseClient.update_documents(collection_name='home_configuration', document={'_id': 4}, object=data)
             if code == 1:
                 logging.info('Data resetted')
             else:

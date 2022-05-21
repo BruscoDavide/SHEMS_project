@@ -25,7 +25,7 @@ class databaseClient():
             self.collections = ['home_configuration', 'data_collected']
             self.name = 'SHEMS_database_local'
         except:
-            logging.info('MongoDB client creation failed')
+            logging.error('MongoDB client creation failed')
     
     def __collectionPointer(self, collection_name):
         """Get or create a collection pointer
@@ -40,7 +40,7 @@ class databaseClient():
         elif collection_name == 'data_collected':
             return self.db.data_collected
         else:
-            logging.info(f'Collection {collection_name} does not created or found')
+            logging.error(f'Collection {collection_name} does not created or found')
 
     def write_document(self, document, collection_name):
         """Insert one or more documents in a specific database collection
@@ -53,7 +53,7 @@ class databaseClient():
             pointer = self.__collectionPointer(collection_name)
             pointer.insert_one(document)
         except:
-            logging.info('Writing document failed')
+            logging.error('Writing document failed')
 
     def count_documents(self, collection_name):
         """Count the number of documents in a specific collection
@@ -67,7 +67,7 @@ class databaseClient():
             pointer = self.__collectionPointer(collection_name)
             return list(pointer.count())
         except:
-            logging.info('Counting document failed')
+            logging.error('Counting document failed')
 
     def read_documents(self, collection_name, document):
         """Read documents from a specific collection
@@ -85,7 +85,7 @@ class databaseClient():
                 d=i
             return d
         except:
-            logging.info('Reading document failed')
+            logging.error('Reading document failed')
 
     def update_documents(self, collection_name, document, object):
         """Update a field of the documents of a collection
@@ -100,10 +100,8 @@ class databaseClient():
         try:
             pointer = self.__collectionPointer(collection_name)
             pointer.update_one(document, {'$set': object})
-            logging.info('Update document success')
             return 1
         except:
-            logging.info('Update document failed')
             return 0
 
     def delete_documents(self, collection_name, document):
@@ -119,4 +117,4 @@ class databaseClient():
             pointer = self.__collectionPointer(collection_name)
             return list(pointer.delete_one(document))
         except:
-            logging.info('Delete document failed')
+            logging.error('Delete document failed')

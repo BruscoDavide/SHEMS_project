@@ -22,7 +22,7 @@ class EV_publisher():
             self.EV_topic = cfg['carStation_topic']
             self.status = None
         except:
-            logging.info('EV_publisher does not created: possible internet connection problem')
+            logging.warning('EV_publisher does not created: possible internet connection problem')
 
     def EV_notify(self):
         """EV arriving or departure
@@ -53,7 +53,7 @@ class HW_publisher():
             self.publisher.start()
             self.EV_topic = cfg['waterWithdrawn_topic']
         except:
-            logging.info('HW_publisher does not created: possible internet connection problem')
+            logging.warning('HW_publisher does not created: possible internet connection problem')
 
     def HW_notify(self):
         """HW used amount
@@ -83,7 +83,7 @@ class smartMeter():
             self.SM_topic = cfg['smartMeter_topic']
             self.time_granularity = cfg['time_granularity']
         except:
-            logging.info('Smart meter does not created: possible internet connection problem')
+            logging.warning('Smart meter does not created: possible internet connection problem')
 
     def RTP_notify(self):
         """
@@ -114,7 +114,8 @@ class smartMeter():
                     h = 0.17
                 RTP_list.append(np.random.uniform(low=l, high=h))
             
-            self.publisher.myPublish(self.SM_topic, len(RTP_list))
+            self.publisher.myPublish(self.SM_topic, RTP_list)
+            logging.info('SM publisher active')
         except:
             logging.error('SM publisher error')
 class generalAppliances_subscriber(): 
@@ -134,7 +135,7 @@ class generalAppliances_subscriber():
             #self.generalAppliances_topic = str(self.clientID)+'_topic'
             #self.subscriber.mySubscribe(self.generalAppliances_topic)
         except:
-            logging.info(f'General appliance does not created: possible internet connection problem')
+            logging.warning(f'General appliance does not created: possible internet connection problem')
     
     def subscriber_callback(self, msg):
         pass
@@ -153,22 +154,30 @@ if __name__ == '__main__':
     cfg = json.load(fp)
     fp.close()
 
-    EV = EV_publisher(cfg)
-    HW = HW_publisher(cfg)
-    SM = smartMeter(cfg)
-    n = 5
-    appliances = []
-    for i in range(n):
-        appliances.append(generalAppliances_subscriber(cfg))
+    try:
+        EV = EV_publisher(cfg)
+        HW = HW_publisher(cfg)
+        SM = smartMeter(cfg)
+        n = 5
+        appliances = []
+        for i in range(n):
+            appliances.append(generalAppliances_subscriber(cfg))
+        
+        logging.info('Sensors, actuators and smart meter connection performed')
+    except:
+        logging.error('Sensors, actuators and smart meter connection failed')
 
     SM_flag = True
 
     while True:
         now = datetime.now()
-        if now.strftime("%H:%M") == "08:00" and SM_flag:
+        if SM_flag: #now.strftime("%H:%M") == "08:00" and SM_flag:
+            
             # 8 a.m.   24*60*60 every day
-            SM = perpetualTimer(t=24*60*60, hFunction=SM.RTP_notify)
-            SM.start()
+            SM.RTP_notify()
+            #SM = perpetualTimer(t=24*60*60, hFunction=SM.RTP_notify)
+            #SM.start()
+
             SM_flag = False
 
         #EV_timer = perpetualTimer(t=, hFunction=EV.EV_notify) 

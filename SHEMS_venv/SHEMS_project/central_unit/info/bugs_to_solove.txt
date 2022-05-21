@@ -1,61 +1,29 @@
-
-1. the app have to return the message provided by the http response, for instance if the registration failed, the user will receive "new registration failed" 
-and maybe the new layouts/page is again the first one.
-
-2. httpresponse provide to you a string, cast it into a dictionary, example:
-backend side:
-    d = {a:1, b:2}
-    s = str(d)
-    httpresponse(d)
-frontend side:
-    s = httprequest()
-    # s is a string
-    d = json.loads(s) # in python should be something similar in javascript idk
+davide:
+- change scheduling: 
+mi dice che l'ha fatto ma poi non l'ha fatto, verifico poi con scheduling
+ma magari è anche aggiornato il Phouse_consume anzi sicuramente però non lo è lo scehduling...infatti io non lo faccio!
+- error data enough when summary asks for too much data
+- afer tot if the request is not solved clean the commands and data files - command GUI (append data) not working sometimes, with addAppliances never
+**bugs
+- c'è un bug a riga 201 di main.py
+- old parameters has a bug.. idk why but the request is performed and it shoudl work but the system dosn't clean the commadns file:
+    i put a counter that after three times force the cleaninig and send to the user an advice.
 
 
 
 
 
 
-
-
-
-3.registration:
-- the EV dictionary is empty, only that one. .SHEMS_webserver/views.py line 387 i recover the dictionary,
-line 391 i print it but it is empty
-
-4. home dosn't show the data provided by the system??
-
-5. schduling has a long list of icons. From my side i can see the data, there is an example of what i provide to you 
-in the folder ./info/scheduling_test.json
-
--> when this is fixed we can check the other commands of this part
-
-5. summary.. i don't understand if it is working or not, i need to prepare a file with all the data stored if not the system 
-find some erros due to lack of data
-
-EV_battery, ESS_battery wrong url summary2/
-
-8. community... i don't understand if it is owkring or not, i need to prepare a file like in the summary case
-wrong url /plot, correct url community/plots ... prosumers
-
-9. old parameters has a bug.. idk why but the request is performed and it shoudl work but the system dosn't clean the commadns file:
-i put a counter that after three times force the cleaninig and send to the user an advice.
-I need to insert also famili name in old parameters, i will do it this afternnon is avery quick operation
-
-the info disappear... 
-
-addAppliances 
-{
-    action: ...
-    applianceData: {
-        name 
-        ...
-    }
-}
-delete appliances ... no present ... check after GET problem fixed
-changeSetpoints... no request or wrong?
-
-last point!!!
-suggestion: have we got control about the data that are inserted by the user ... 
-what happend if the user insert 1000 °C as temperature? or if the minimum battery level is higher than the biggest one
+alejo:
+- EWH-scheduling, only power or not?? Ask also to stefan
+- (change scheduling append data on the page...), just sometime
+- add EV_flag for oldParameters and summary True/False
+- finish to modify deleteAppliances/addAppliance
+---
+- the app have to return the message provided by the http response, for instance if the registration failed, the user will receive "new registration failed" 
+and maybe the new layouts/page is again the first one
+// response.data.responseFlag if 'True' -> as you are just doing 
+// elif 'False' -> only read message 
+// message is a new filed insiede response.data (response.data.message) 
+- connection again to websocket
+- (have we got control about the data that are inserted by the user) last point

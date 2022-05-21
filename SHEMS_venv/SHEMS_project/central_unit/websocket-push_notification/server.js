@@ -12,6 +12,8 @@ wss.on("connection", ws => {
 
     
     var payload = require('./files/starting_configuration.json');
+    //pensare alla struttura con la quale è fatto il dizionario o il messaggio e stampare
+    // {"pushes": []}
     ws.send(String(payload));
     //clear file ora mi stampa [object Object]
 

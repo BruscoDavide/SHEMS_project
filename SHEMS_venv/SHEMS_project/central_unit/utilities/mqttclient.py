@@ -38,8 +38,8 @@ class MQTTPublisher():
             topic (string): topic of the message
             msg (python object): message delivered
         """
-        logging.info(f'Publishing {msg} with topic {topic}') 
         self._paho_mqtt.publish(topic, json.dumps(msg),0) 
+        logging.info(f'Publishing {msg} with topic {topic}') 
 
 class MQTTSubscriber(): 
     """

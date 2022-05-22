@@ -63,7 +63,6 @@ class SHEMS():
         4 - car at home
         """
         if payload["command"] == 0:
-            self.instance = self.get_new_instance()
             self.changed_set_points = 1
         elif payload["command"] == 1:
             self.modify_appliance["flag"] = 1
@@ -121,7 +120,7 @@ class SHEMS():
     #           -> starts now the appliance
     #           -> take custom requests with specific starting times -> RECALL TO TELL ALEJO TO INSERT THE CONTROLS
     #
-    def solve_definitive(self, time_limit = None, gap = None, verbose = False):
+    def solve_definitive(self, installation, time_limit = None, gap = None, verbose = False):
         """
             The function is composed always by the same building blocks, but it changes the way it is composed, depending on the flags that are passed
             There can be different scenarios:

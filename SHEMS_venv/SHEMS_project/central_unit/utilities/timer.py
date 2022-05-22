@@ -14,7 +14,7 @@ class perpetualTimer():
 
     def handle_function(self):
         self.hFunction()
-        self.thread = Timer(self.t,self.handle_function)
+        self.thread = Timer(self.t, self.handle_function)
         self.thread.start()
 
     def start(self):

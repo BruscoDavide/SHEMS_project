@@ -36,22 +36,20 @@ def append_commands(command, flag_payload, payload=None):
     """
     logging.info('append_commands')
 
-    commands = ['home', 'appliances', 'scheduling', 'changeScheduling', 'summary', 'settings', 'changeSetpoints', 'deleteAppliances', 'addAppliances'
+    commands = ['home', 'appliances', 'scheduling', 'changeScheduling', 'summary', 'settings', 'changeSetpoints', 'deleteAppliances', 'addAppliances',
                 'communityPlots', 'communityProsumers', 'registration', 'listDevice', 'oldParameters']
     if command in commands:
         try:
             fp = open(commands_path)
             file = json.load(fp)
             fp.close()
-
-            code = str(datetime.datetime.now()).split('.')[0]
+            code = str(datetime.datetime.now()) #.split('.')[0]
             data = {
                 "command": command,
                 "timestamp": code
             }
             if flag_payload: data['payload'] = payload
             file['commands_list'].append(data)
-
             fp = open(commands_path, 'w')
             json.dump(file, fp)
             fp.close() 
@@ -60,6 +58,7 @@ def append_commands(command, flag_payload, payload=None):
         except:
             append_commands_error += 1
             if append_commands_error > 3:
+                append_commands_error = 0
                 fp = open(commands_path)
                 file = json.load(fp)
                 fp.close
@@ -76,6 +75,9 @@ def append_commands(command, flag_payload, payload=None):
             
             logging.warning('Appending error, GUI_thread_data.json, GUI_thread_commands.json resetted')
             return None
+    else:
+        logging.warning('Appending error, GUI_thread_data.json, GUI_thread_commands.json resetted')
+        return None
 
 
 def read_data(code):
@@ -119,6 +121,7 @@ def read_data(code):
     if c == t:
         read_data_error += 1
         if read_data_error > 3:
+            read_data_error = 0
             fp = open(commands_path)
             file = json.load(fp)
             fp.close
@@ -184,7 +187,6 @@ def scheduling(request):
     else:
         data = {}
         data['message'] = 'Appending error, GUI_thread_data.json, GUI_thread_commands.json resetted'
-        data['responseFlag'] = 'False'
         logging.info(data)
     e = time.time()
     logging.info(f'"scheduling" timing {s-e}')
@@ -206,7 +208,6 @@ def listDevice(request):
     code = append_commands(command='listDevice', flag_payload=False)
     if code != None:
         data = read_data(code=code)
-        data['responseFlag'] = 'True'
         logging.info(data)
     else:
         data = {}
@@ -245,7 +246,6 @@ def changeScheduling(request):
         code = append_commands(command='changeScheduling', flag_payload=True, payload=payload)
         if code != None:
             data = read_data(code=code)
-            data['responseFlag'] = 'True'
             logging.info(data)
         else:
             data = {}
@@ -282,7 +282,6 @@ def summary(request):
         code = append_commands(command='summary', flag_payload=True, payload=payload)
         if code != None:
             data = read_data(code=code)
-            data['responseFlag'] = 'True'
             logging.info(data)
         else:
             data = {}
@@ -312,7 +311,6 @@ def oldParameters(request):
     code = append_commands(command='oldParameters', flag_payload=False)
     if code != None:
         data = read_data(code=code)
-        data['responseFlag'] = 'True'
         logging.info(data)
     else:
         data = {}
@@ -353,7 +351,6 @@ def settings(request):
             code = append_commands(command='changeSetpoints', flag_payload=True, payload=payload)
             if code != None:
                 data = read_data(code=code)
-                data['responseFlag'] = 'True'
                 logging.info(data)
             else:
                 data = {}
@@ -386,7 +383,6 @@ def settings(request):
             code = append_commands(command='addAppliances', flag_payload=True, payload=payload)
             if code != None:
                 data = read_data(code=code)
-                data['responseFlag'] = 'True'
                 logging.info(data)
             else:
                 data = {}
@@ -409,7 +405,6 @@ def settings(request):
             data = append_commands(command='deleteAppliances', flag_payload=True, payload=payload)
             if code != None:
                 data = read_data(code=code)
-                data['responseFlag'] = 'True'
                 logging.info(data)
             else:
                 data = {}
@@ -446,7 +441,6 @@ def communityPlots(request):
         code = append_commands(command='communityPlots', flag_payload=True, payload=payload)
         if code != None:
             data = read_data(code=code)
-            data['responseFlag'] = 'True'
             logging.info(data)
         else:
             data = {}
@@ -475,7 +469,6 @@ def communityProsumers(request):
     code = append_commands(command='communityProsumers', flag_payload=True)
     if code != None:
         data = read_data(code=code)
-        data['responseFlag'] = 'True'
         logging.info(data)
     else:
         data = {}
@@ -505,7 +498,7 @@ def registration(request):
     try:
         s = time.time()
         data = json.loads(request.body)
-        logging.info(f'Receiveed data: {data}')
+        logging.info(f'Received data: {data}')
 
         payload = {}
         payload['family_name'] = data['family_name']
@@ -516,7 +509,6 @@ def registration(request):
         code = append_commands(command='registration', flag_payload=True, payload=payload)
         if code != None:
             data = read_data(code=code)
-            data['responseFlag'] = 'True'
             logging.info(data)
         else:
             data = {}

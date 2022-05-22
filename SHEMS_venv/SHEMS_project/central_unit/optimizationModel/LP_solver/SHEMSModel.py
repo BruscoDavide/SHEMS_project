@@ -180,9 +180,26 @@ class SHEMS():
                 if np.sum(self.ud_out[0:start_point-1,t]) >= self.instance.sched_appliances["running_len"][t]:
                     flags_runnining_appliances[t] = 2 #done, no more in the model
 
-        elif self.first_iteration == 1: #FIRST RUN OF THE DAY, RUN THE FULL MODEL
+        elif self.first_iteration == 1 and installation == 0: #FIRST RUN OF THE DAY, RUN THE FULL MODEL
             start_point = 0
             remaining_minutes = 1440
+        
+        elif self.first_iteration == 1 and installation == 1:
+            act_datetime = datetime.datetime.now()
+            act_datetime = str(act_datetime)
+            act_datetime = act_datetime.split()
+            act_time = act_datetime[1].split(':')
+            if act_time[0] == '00' or int(act_time[0]) < 8:
+                act_mins = 16*60 #hours passed from 8 to midnight
+                act_mins += int(act_time[0])
+                act_mins += int(act_time[1])
+            else:
+                act_mins = (int(act_time[0]) - 8)*60
+                act_mins += int(act_time[1])
+            start_point = math.ceil(act_mins/self.instance.time_granularity ) 
+            self.start_point = start_point 
+            remaining_minutes = 1440 - act_mins
+            tmp = math.floor(remaining_minutes/self.instance.time_granularity)
         
         ###### SCHED APPLIANCES VARS ######
         #If all the appliances were already set and the user doesn't ask to modify an appliance, the this part can be skipped from the model

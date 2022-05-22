@@ -402,9 +402,6 @@ class SHEMS_main():
                             logging.error('"Home" GET request failed')
 
                     elif c['command'] == 'scheduling' and self.model:
-                        logging.info(self.shems.ud_out)
-                        logging.info(self.shems.Pac_out)
-                        logging.info(self.shems.Pewh_out)
                         logging.info('GUI_thread_callback-scheduling')
                         try:
                             data = {}
@@ -448,7 +445,7 @@ class SHEMS_main():
                                         ob['label'].append(str(hou)+":"+str(min))
                                         ob['data'].append(1)
                                     # 1
-                                    elif self.shems.Tewh_out[i] == 1:
+                                    elif self.shems.ud_out[i][j] == 1:
                                         if i == 0: # start
                                             if min % 60 == 0:
                                                 hou = int(i*self.time_granularity/60)
@@ -1302,6 +1299,9 @@ class SHEMS_main():
                                         data['responseFlag'] = 'False'
                                         self.__append_data(code=timestamp, data=data)
                                         logging.info(f'New registration success, mathematical model active')
+
+
+                                        logging.info(self.shems.Tin_out)
                                     else:
                                         data = {}
                                         data['message'] = f'New registration success, mathematical model error, code = {cd}'

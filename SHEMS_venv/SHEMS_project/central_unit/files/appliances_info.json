@@ -1,7 +1,7 @@
 {
     "washing_machine": {
         "name": "washing_machine",
-        "running_len": 2,
+        "running_len": 5,
         "num_cycles": 1, 
         "power_cons": 1.5, 
         "c1": 1,
@@ -10,7 +10,7 @@
     },
     "dishwasher": {
         "name": "dishwasher",
-        "running_len": 2,
+        "running_len": 7,
         "num_cycles": 1, 
         "power_cons": 1.2, 
         "c1": 1,

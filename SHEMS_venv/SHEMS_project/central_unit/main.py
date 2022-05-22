@@ -4,7 +4,6 @@ import logging
 import requests
 import datetime
 import numpy as np
-from zmq import EVENT_CLOSE_FAILED
 
 from utilities.timer import perpetualTimer
 from utilities.mqttclient import MQTTSubscriber
@@ -71,6 +70,8 @@ class SHEMS_main():
             except:
                 logging.warning('Possible internet connection problem')
 
+            self.GUI_thread_callback_error = 0
+
             logging.info('Environment generation done, SHEMS model not active')
         except:
             logging.warning('Environment generation failed')
@@ -96,7 +97,7 @@ class SHEMS_main():
             self.instance.get_data_serv()
             self.shems.get_new_instance(self.instance)
 
-            cod = self.shems.solve_definitive()
+            cod = self.shems.solve_definitive(0)
             if cod == 2:
                 try:
                     self.__historyData_saving()
@@ -251,7 +252,7 @@ class SHEMS_main():
             self.instance.get_data_serv()
             self.shems.get_new_instance(self.instance)
 
-            cod = self.shems.solve_definitive()
+            cod = self.shems.solve_definitive(0)
             if cod == 2:
                 try:
                     self.__historyData_saving(step)
@@ -401,6 +402,9 @@ class SHEMS_main():
                             logging.error('"Home" GET request failed')
 
                     elif c['command'] == 'scheduling' and self.model:
+                        logging.info(self.shems.ud_out)
+                        logging.info(self.shems.Pac_out)
+                        logging.info(self.shems.Pewh_out)
                         logging.info('GUI_thread_callback-scheduling')
                         try:
                             data = {}
@@ -408,11 +412,13 @@ class SHEMS_main():
                             for j in range(self.shems.instance.N_sched_appliances):  # columns
                                 ob = {}
                                 ob['data'] = []
+                                ob['label'] = []
                                 info = self.databaseClient.read_documents(collection_name='home_configuration', document={'_id': 4})
                                 ob['name'] = info['appliances']['sched_appliances']['name'][j]
-                                for i in range(int(60/self.time_granularity*24-1)):  # rows
-                                    if i != 0 and self.shems.ud_out[i][j] == 1 and self.shems.ud_out[i-1][j] == 0:
-                                        min = i*self.time_granularity
+                                for i in range(int(60/self.time_granularity*24)):  # rows
+                                    min = i*self.time_granularity
+                                    # start
+                                    if i != 0 and i != int(60/self.time_granularity*24-1) and self.shems.ud_out[i][j] == 1 and self.shems.ud_out[i-1][j] == 0:
                                         if min % 60 == 0:
                                             hou = int(i*self.time_granularity/60)
                                             min = 0
@@ -422,10 +428,14 @@ class SHEMS_main():
                                         if hou + 8 > 23: hou = (hou+8)-23
                                         else: hou = hou + 8
                                         ob['start'] = str(hou)+':'+str(min)
+                                        ob['label'].append(str(hou)+":"+str(min))
                                         ob['data'].append(1)
-                                    elif self.shems.ud_out[i][j] == 1 and self.shems.ud_out[i+1][j] == 0:
-                                        end = i
-                                        min = i*self.time_granularity
+                                    # end
+                                    elif i !=0  and i != int(60/self.time_granularity*24-1) and self.shems.ud_out[i][j] == 1 and self.shems.ud_out[i+1][j] == 0:
+                                        done = 0
+                                        if i <= step: done = 1
+                                        ob['done'] = done
+
                                         if min % 60 == 0:
                                             hou = int(i*self.time_granularity/60)
                                             min = 0
@@ -435,20 +445,56 @@ class SHEMS_main():
                                         if hou + 8 > 23: hou = (hou+8)-23
                                         else: hou = hou + 8
                                         ob['end'] = str(hou)+':'+str(min) 
+                                        ob['label'].append(str(hou)+":"+str(min))
                                         ob['data'].append(1)
-                                        
-                                        done = 0
-                                        if end <= step:
-                                            done = 1
-                                        ob['done'] = done
-
+                                    # 1
                                     elif self.shems.Tewh_out[i] == 1:
-                                        ob['data'].append(1)
+                                        if i == 0: # start
+                                            if min % 60 == 0:
+                                                hou = int(i*self.time_granularity/60)
+                                                min = 0
+                                            else:
+                                                hou = int((min - min%60)/60)
+                                                min = min - 60*hou
+                                            if hou + 8 > 23: hou = (hou+8)-23
+                                            else: hou = hou + 8
+                                            ob['start'] = str(hou)+':'+str(min)
+                                            ob['label'].append(str(hou)+":"+str(min))
+                                            ob['data'].append(1)
+                                        if i == int(60/self.time_granularity*24-1): # end
+                                            done = 0
+                                            if i <= step: done = 1
+                                            ob['done'] = done
+
+                                            if min % 60 == 0:
+                                                hou = int(i*self.time_granularity/60)
+                                                min = 0
+                                            else:
+                                                hou = int((min - min%60)/60)
+                                                min = min - 60*hou
+                                            if hou + 8 > 23: hou = (hou+8)-23
+                                            else: hou = hou + 8
+                                            ob['end'] = str(hou)+':'+str(min) 
+                                            ob['label'].append(str(hou)+":"+str(min))
+                                            ob['data'].append(1)
+                                        else: # 1
+                                            ob['data'].append(1)
+                                            #label
+                                            if min % 60 == 0:
+                                                hou = int(i*self.time_granularity/60)
+                                                if hou + 8 > 23: hou = (hou+8)-23
+                                                else: hou = hou + 8
+                                                ob['label'].append(str(hou))
+                                            else:
+                                                hou1 = int((min - min%60)/60)
+                                                if hou1 + 8 > 23: hou = (hou1+8)-23
+                                                else: hou = hou1 + 8
+                                                ob['label'].append(str(hou)+":"+str(min-hou1*60))
+                                            
+                                    # 0
                                     else:
                                         ob['data'].append(0)
-
-                                    try:
-                                        min = i*self.time_granularity
+                                        #label
                                         if min % 60 == 0:
                                             hou = int(i*self.time_granularity/60)
                                             if hou + 8 > 23: hou = (hou+8)-23
@@ -459,10 +505,81 @@ class SHEMS_main():
                                             if hou1 + 8 > 23: hou = (hou1+8)-23
                                             else: hou = hou1 + 8
                                             ob['label'].append(str(hou)+":"+str(min-hou1*60))
-                                    except:
-                                        ob['label'] = []
-                                        
-                                        min = i*self.time_granularity
+
+                                ob['consumption'] = info['appliances']['sched_appliances']['power_cons'][j]/(60/self.time_granularity)*info['appliances']['sched_appliances']['running_len'][j]
+                                data['scheduling'].append(ob)
+
+                            name = 'EWH'
+                            ob = {}
+                            ob['name']=name
+                            ob['data'] = []
+                            ob['label'] = []
+                            ob['consumption'] = 0
+                            for i in range(int(60/self.time_granularity*24)):  # rows
+                                min = i*self.time_granularity
+                                # start
+                                if i != 0 and i != int(60/self.time_granularity*24-1) and  self.shems.Tewh_out[i] == 1 and self.shems.Tewh_out[i-1] == 0:
+                                    if min % 60 == 0:
+                                        hou = int(i*self.time_granularity/60)
+                                        min = 0
+                                    else:
+                                        hou = int((min - min%60)/60)
+                                        min = min - 60*hou
+                                    if hou + 8 > 23: hou = (hou+8)-23
+                                    else: hou = hou + 8
+                                    ob['start'] = str(hou)+':'+str(min)
+                                    ob['label'].append(str(hou)+":"+str(min))
+                                    ob['data'].append(1)
+                                # end
+                                elif i !=0  and i != int(60/self.time_granularity*24-1) and  self.shems.Tewh_out[i] == 1 and self.shems.Tewh_out[i-1] == 0:
+                                    done = 0
+                                    if i <= step: done = 1
+                                    ob['done'] = done
+
+                                    if min % 60 == 0:
+                                        hou = int(i*self.time_granularity/60)
+                                        min = 0
+                                    else:
+                                        hou = int((min - min%60)/60)
+                                        min = min - 60*hou
+                                    if hou + 8 > 23: hou = (hou+8)-23
+                                    else: hou = hou + 8
+                                    ob['end'] = str(hou)+':'+str(min) 
+                                    ob['label'].append(str(hou)+":"+str(min))
+                                    ob['data'].append(1)
+                                # 1
+                                elif self.shems.Tewh_out[i] == 1:
+                                    if i == 0: # start
+                                        if min % 60 == 0:
+                                            hou = int(i*self.time_granularity/60)
+                                            min = 0
+                                        else:
+                                            hou = int((min - min%60)/60)
+                                            min = min - 60*hou
+                                        if hou + 8 > 23: hou = (hou+8)-23
+                                        else: hou = hou + 8
+                                        ob['start'] = str(hou)+':'+str(min)
+                                        ob['label'].append(str(hou)+":"+str(min))
+                                        ob['data'].append(1)
+                                    if i == int(60/self.time_granularity*24-1): # end
+                                        done = 0
+                                        if i <= step: done = 1
+                                        ob['done'] = done
+
+                                        if min % 60 == 0:
+                                            hou = int(i*self.time_granularity/60)
+                                            min = 0
+                                        else:
+                                            hou = int((min - min%60)/60)
+                                            min = min - 60*hou
+                                        if hou + 8 > 23: hou = (hou+8)-23
+                                        else: hou = hou + 8
+                                        ob['end'] = str(hou)+':'+str(min) 
+                                        ob['label'].append(str(hou)+":"+str(min))
+                                        ob['data'].append(1)
+                                    else: # 1
+                                        ob['data'].append(1)
+                                        #label
                                         if min % 60 == 0:
                                             hou = int(i*self.time_granularity/60)
                                             if hou + 8 > 23: hou = (hou+8)-23
@@ -470,82 +587,27 @@ class SHEMS_main():
                                             ob['label'].append(str(hou))
                                         else:
                                             hou1 = int((min - min%60)/60)
-                                            if hou + 8 > 23: hou = (hou1+8)-23
+                                            if hou1 + 8 > 23: hou = (hou1+8)-23
                                             else: hou = hou1 + 8
                                             ob['label'].append(str(hou)+":"+str(min-hou1*60))
-
-                                ob['consumption'] = info['appliances']['sched_appliances']['power_cons'][j]/(60/self.time_granularity)*info['appliances']['sched_appliances']['running_len'][j]
-                                data['scheduling'].append(ob)
-                            
-                            logging.info(data)
-
-                            name = 'EWH'
-                            ob = {}
-                            ob['name']=name
-                            ob['data'] = []
-                            for i in range(int(60/self.time_granularity*24-1)):
-                                if i != 0 and self.shems.Tewh_out[i] == 1 and self.shems.Tewh_out[i-1] == 0:
-                                    min = i*self.time_granularity
-                                    if min % 60 == 0:
-                                        hou = int(i*self.time_granularity/60)
-                                        min = 0
-                                    else:
-                                        hou = (min - min%60)/60
-                                        min = min - 60*hou
-                                    if hou + 8 > 23: hou = (hou+8)-23
-                                    else: hou = hou + 8
-                                    ob['start'] = str(hou)+':'+str(min) 
-                                    ob['data'].append(1)
-                                elif self.shems.Tewh_out[i] == 1 and self.shems.Tewh_out[i+1] == 0:
-                                    end = 1
-                                    min = i*self.time_granularity
-                                    if min % 60 == 0:
-                                        hou = int(i*self.time_granularity/60)
-                                        min = 0
-                                    else:
-                                        hou = (min - min%60)/60
-                                        min = min - 60*hou
-                                    if hou + 8 > 23: hou = (hou+8)-23
-                                    else: hou = hou + 8
-                                    ob['end'] = str(hou)+':'+str(min) 
-                                    ob['data'].append(1)
-                                    done = 0
-                                    if end <= step:
-                                        done = 1
-                                    ob['done'] = done
-                                elif self.shems.Tewh_out[i] == 1:
-                                    ob['data'].append(1)
+                                        
+                                # 0
                                 else:
                                     ob['data'].append(0)
-
-                                try:
-                                    min = i*self.time_granularity
-                                    if min % 60 == 0:
-                                        hou = int(i*self.time_granularity/60)
-                                        ob['label'].append(str(hou))
-                                    else:
-                                        hou = (min - min%60)/60
-                                        ob['label'].append(str(hou)+":"+str(min-hou*60))
-                                except:
-                                    ob['label'] = []
-                                    min = i*self.time_granularity
+                                    #label
                                     if min % 60 == 0:
                                         hou = int(i*self.time_granularity/60)
                                         if hou + 8 > 23: hou = (hou+8)-23
                                         else: hou = hou + 8
                                         ob['label'].append(str(hou))
                                     else:
-                                        hou = (min - min%60)/60
-                                        if hou + 8 > 23: hou = (hou1+8)-23
+                                        hou1 = int((min - min%60)/60)
+                                        if hou1 + 8 > 23: hou = (hou1+8)-23
                                         else: hou = hou1 + 8
-                                        ob['label'].append(str(hou)+":"+str(min-hou1*60))
-
-                                try:
-                                    ob['consumption'] += self.shems.Pewh_out[i]/(60/self.time_granularity)
-                                except:
-                                    ob['consumption'] = 0
-                                    ob['consumption'] += self.shems.Pewh_out[i]/(60/self.time_granularity)
-                            
+                                        ob['label'].append(str(hou)+":"+str(min-hou1*60)) 
+                                
+                                ob['consumption'] += self.shems.Pewh_out[i]/(60/self.time_granularity)
+                           
                             data['scheduling'].append(ob)
                             data['responseFlag'] = 'True'
 
@@ -583,12 +645,14 @@ class SHEMS_main():
                         try:
                             payload = c['payload']
                             payload['command'] = 1
+                            logging.info('riga 648')
+                            logging.info(payload)
 
                             self.instance.get_data_serv()
                             self.shems.get_new_instance(self.instance)
 
                             self.shems.set_working_mode(payload)
-                            cod = self.shems.solve_definitive()
+                            cod = self.shems.solve_definitive(0)
 
                             if cod == 2:
                                 self.__historyData_saving(step)
@@ -618,7 +682,6 @@ class SHEMS_main():
                         try:
                             payload = c['payload']
                             data = self.databaseClient.read_documents(collection_name='data_collected', document={'_id': 'history'})
-                            logging.info(data['Phouse_consume'])
                             requiredData = {}
 
                             if payload['appliance'] == 'consumption':
@@ -813,35 +876,35 @@ class SHEMS_main():
                         logging.info('GUI_thread_callback-changeSetpoins')
                         code = 1
                         payload = c['payload']
-
+                        #TODO: check if alejo ha messo new_values o oldParameters
                         data = self.databaseClient.read_documents(collection_name='home_configuration', document={'_id': 0})
-                        data['home_setpoints']['Tin_max'] = float(payload['oldParameters']['Tin_max'])
-                        data['home_setpoints']['Tin_min'] = float(payload['oldParameters']['Tin_min'])
-                        data['home_setpoints']['Tewh_max'] = float(payload['oldParameters']['Tewh_max'])
-                        data['home_setpoints']['Tewh_min'] = float(payload['oldParameters']['Tewh_min'])
-                        code = code*self.databaseClient.update_documents(collection_name='home_configuration', document={'_id': 0}, data=data)
-
-                        data = self.databaseClient.read_documents(collection_name='batteries', document={'_id': 3})
-                        data['batteries']['Cess_thresh_low'] = float(payload['oldParameters']['Cess_thresh_low'])/100
-                        data['batteries']['Cess_thresh_high'] = float(payload['oldParameters']['Cess_thresh_high'])/100
-                        data['batteries']['Cpev_thresh_low'] = float(payload['oldParameters']['Cpev_thresh_low'])/100
-                        data['batteries']['Cpev_thresh_high'] = float(payload['oldParameters']['Cpev_thresh_high'])/100
-                        code = code*self.databaseClient.update_documents(collection_name='batteries', document={'_id': 3}, data=data)
-
-                        data = self.databaseClient.read_documents(collection_name='time', document={'_id': 7})
-                        data['time']['time_dep'] = payload['oldParameters']['time_dep']
-                        code = code*self.databaseClient.update_documents(collection_name='time', document={'_id': 7}, data=data)
-
+                        data['home_setpoints']['Tin_max'] = float(payload['new_values']['Tin_max'])
+                        data['home_setpoints']['Tin_min'] = float(payload['new_values']['Tin_min'])
+                        data['home_setpoints']['Tewh_max'] = float(payload['new_values']['Tewh_max'])
+                        data['home_setpoints']['Tewh_min'] = float(payload['new_values']['Tewh_min'])
+                        code = code*self.databaseClient.update_documents('home_configuration', {'_id': 0}, data)
+                        data = self.databaseClient.read_documents(collection_name='home_configuration', document={'_id': 3})
+                        data['batteries']['Cess_thresh_low'] = float(payload['new_values']['Cess_thresh_low'])/100
+                        data['batteries']['Cess_thresh_high'] = float(payload['new_values']['Cess_thresh_high'])/100
+                        data['batteries']['Cpev_thresh_low'] = float(payload['new_values']['Cpev_thresh_low'])/100
+                        data['batteries']['Cpev_thresh_high'] = float(payload['new_values']['Cpev_thresh_high'])/100
+                        code = code*self.databaseClient.update_documents('home_configuration', {'_id': 3}, data)
+                        try:
+                            data = self.databaseClient.read_documents(collection_name='home_configuration', document={'_id': 7})
+                            data['time']['time_dep'] = payload['new_values']['time_dep']
+                            code = code*self.databaseClient.update_documents(collection_name='time', document={'_id': 7}, data=data)
+                        except:
+                            pass
                         payload['command'] = 0
                         payload['start_time'] = []
-                        del payload['new_value']
+                        payload['appliance'] = []
+                        del payload['new_values']
 
                         self.instance.get_data_serv()
                         self.shems.get_new_instance(self.instance)
-
                         self.shems.set_working_mode(payload)
-                        cod = self.shems.solve_definitive()
-                        
+                        cod = self.shems.solve_definitive(0)
+
                         if code == 1:
                             #self.__append_data(code=timestamp, data={'response': 'Updating setpoints success'})
                             logging.info('Updating setpoints success')
@@ -869,42 +932,47 @@ class SHEMS_main():
                     elif c['command'] == 'addAppliances' and self.model:
                         logging.info('GUI_thread_callback-addAppliances')
                         payload = c['payload']
-
+                        #TODO: check con alejo come ha costruito il dict: con ['applianceData] o senza
+                        logging.info(payload)
                         data = self.databaseClient.read_documents(collection_name='home_configuration', document={'_id': 4})
-                        fp = open('./files/appliances_info.json')
-                        cfg = json.load(fp)
-                        fp.close()
-
-                        if payload['applianceData']['name'] != 'washing_machine' or payload['applianceData']['name'] != 'dishwasher' or payload['applianceData']['name'] != 'vacuum_cleaner':
+                        logging.info(data)
+                        if payload['name'] != 'Washing machine' and payload['name'] != 'Dishwasher' and payload['name'] != 'Vacuum cleaner':
                             data['appliances']['N_sched_appliances'] += 1
-                            data['appliances']['sched_appliances']['name'].append(payload['applianceData']['name'])
+                            data['appliances']['sched_appliances']['name'].append(payload['name'])
                             running_len = payload['applianceData']['running_len']
                             running_len = int(running_len/self.time_granularity)
                             data['appliances']['sched_appliances']['running_len'].append(running_len)
                             data['appliances']['sched_appliances']['num_cycles'].append(1)
-                            data['appliances']['sched_appliances']['power_cons'].append(payload['applianceData']['power_cons'])
+                            data['appliances']['sched_appliances']['power_cons'].append(payload['power_cons'])
                             data['appliances']['sched_appliances']['c1'].append(1)
                             data['appliances']['sched_appliances']['c2'].append(2)
                         else:
+                            fp = open('./files/appliances_info.json')
+                            cfg = json.load(fp)
+                            fp.close()
+                            logging.info(cfg)
                             data['appliances']['N_sched_appliances'] += 1
-                            data['appliances']['sched_appliances']['name'].append(payload['applianceData']['name'])
-                            data['appliances']['sched_appliances']['running_len'].append(cfg[payload['applianceData']['name']]['running_len'])
-                            data['appliances']['sched_appliances']['num_cycles'].append(cfg[payload['applianceData']['name']]['num_cycles'])
-                            data['appliances']['sched_appliances']['power_cons'].append(cfg[payload['applianceData']['name']]['power_cons'])
-                            data['appliances']['sched_appliances']['c1'].append(cfg[payload['applianceData']]['c1'])
-                            data['appliances']['sched_appliances']['c2'].append(cfg[payload['applianceData']]['c2'])
-                        code = self.databaseClient.update_documents(collection_name='home_configuration', document={'_id': 4}, data=data)
+                            data['appliances']['sched_appliances']['name'].append(payload['name'])
+                            data['appliances']['sched_appliances']['running_len'].append(cfg[payload['name']]['running_len'])
+                            data['appliances']['sched_appliances']['num_cycles'].append(cfg[payload['name']]['num_cycles'])
+                            data['appliances']['sched_appliances']['power_cons'].append(cfg[payload['name']]['power_cons'])
 
-                        del payload['applianceData']
+                            data['appliances']['sched_appliances']['c1'].append(cfg[payload['name']]['c1'])
+                            logging.info('l')
+                            data['appliances']['sched_appliances']['c2'].append(cfg[payload]['c2'])
+                        code = self.databaseClient.update_documents('home_configuration', {'_id': 4}, data)
+                        logging.info('c1')
+                        del payload['payload']
                         payload['command'] = 2
                         payload['appliance'] = []
                         payload['start_time'] = []
-
+                        logging.info('d')
                         self.instance.get_data_serv()
                         self.shems.get_new_instance(self.instance)
-
+                        logging.info('e')
                         self.shems.set_working_mode(payload)
-                        cod = self.shems.solve_definitive()
+                        cod = self.shems.solve_definitive(0)
+                        logging.info('f')
                         if code == 1:
                             logging.info('Data updated')
                             if cod == 2:
@@ -952,7 +1020,7 @@ class SHEMS_main():
                                 self.shems.get_new_instance(self.instance)
 
                                 self.shems.set_working_mode(payload)
-                                cod = self.shems.solve_definitive()
+                                cod = self.shems.solve_definitive(0)
 
                                 if code == 1: 
                                     logging.info('Data updated')
@@ -1153,7 +1221,6 @@ class SHEMS_main():
                             code = 1
                             payload = c['payload']
                             data = {}
-
                             data['name'] = payload['family_name']['family_name']
 
                             # Minimum and maximum temperature of the environment and of the WH
@@ -1166,10 +1233,8 @@ class SHEMS_main():
                             data['family_name'] = payload['family_name']['family_name']
 
                             code = code * self.databaseClient.update_documents('home_configuration', {'_id': 0}, data)
-    
                             # Departure car time, minimum and maximum threashold charging level (home and EV)
-                            data = self.databaseClient.read_documents(
-                                collection_name='home_configuration', document={'_id': 3})
+                            data = self.databaseClient.read_documents(collection_name='home_configuration', document={'_id': 3})
                             try:
                                 data['batteries']['Cpev_thresh_low'] = int(payload['EV']['Cpev_thresh_low']/100)
                                 data['batteries']['Cpev_thresh_high'] = int(payload['EV']['Cpev_thresh_high']/100)
@@ -1182,17 +1247,15 @@ class SHEMS_main():
                             data['batteries']['Cess_thresh_high'] = int(payload['home_batteries']['Cess_thresh_high'])/100
                             code = code * self.databaseClient.update_documents('home_configuration', {'_id': 3}, data)
                             data = self.databaseClient.read_documents(collection_name='home_configuration', document={'_id': 7})
+                            
                             try:
                                 data['time']['time_dep'] = payload['EV']['Time_departure']
                             except:
                                 pass
                                 # None -> for not having the car
                             code = code * self.databaseClient.update_documents('home_configuration', {'_id': 7}, data)
-                            
                             # appliances:[modello, lavatrice-lavastovigle-vacuum cliner]
-                            fp = open('./files/appliances_info.json')
-                            cfg = json.load(fp)
-                            fp.close()
+                            
                             data = self.databaseClient.read_documents(collection_name='home_configuration', document={'_id': 4})
                             for i in payload['applianceData']:
                                 if i['name'] == 'none':
@@ -1208,6 +1271,9 @@ class SHEMS_main():
                                     data['appliances']['sched_appliances']['c1'].append(1)
                                     data['appliances']['sched_appliances']['c2'].append(2)
                                 else:
+                                    fp = open('./files/appliances_info.json')
+                                    cfg = json.load(fp)
+                                    fp.close()
                                     data['appliances']['N_sched_appliances'] += 1
                                     data['appliances']['sched_appliances']['name'].append(i['name'])
                                     data['appliances']['sched_appliances']['running_len'].append(int(cfg[i['name']]['running_len']))
@@ -1225,7 +1291,8 @@ class SHEMS_main():
                                 try:
                                     self.instance.get_data_serv()
                                     self.shems = SHEMS(self.instance)
-                                    cod = self.shems.solve_definitive()
+                                    cod = self.shems.solve_definitive(1
+                                    )
                                     if cod == 2:
                                         self.model = True
                                         self.__historyData_saving()
@@ -1234,7 +1301,7 @@ class SHEMS_main():
                                         data['message'] = 'New registration success, mathematical model active'
                                         data['responseFlag'] = 'False'
                                         self.__append_data(code=timestamp, data=data)
-                                        logging.error(f'New registration success, mathematical model active')
+                                        logging.info(f'New registration success, mathematical model active')
                                     else:
                                         data = {}
                                         data['message'] = f'New registration success, mathematical model error, code = {cd}'
@@ -1277,7 +1344,21 @@ class SHEMS_main():
                     self.__clear_file(path=self.commands_path, timestamp=timestamp)
 
         except:
+            self.GUI_thread_callback_error += 1
             logging.error('User command reading or execution error')
+            if self.GUI_thread_callback_error > 3:
+                self.GUI_thread_callback_error = 0
+                self.__clear_file(self.commands_path, None)
+                self.__clear_file(self.data_path, None)
+                logging.warning('Cleaning files error: repeat the operation')
+                fp = open(self.push_path)
+                pushes = json.load(fp)
+                fp.close()
+                payload = {'message': 'Cleaning files error: repeat the operation'}
+                pushes['pushes'].append(payload)
+                fp = open(self.push_path, 'w')
+                json.dump(pushes, fp)
+                fp.close()
 
     def __clear_file(self, path, timestamp=None):
         logging.info('__clear_file')

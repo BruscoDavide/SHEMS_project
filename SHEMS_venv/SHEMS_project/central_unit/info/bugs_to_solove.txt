@@ -1,21 +1,9 @@
 davide:
 - change scheduling --> da vedere versione codice
-- addaplinaces: i nomi
-- deteleapplliances : i nomi
-- spostare ewh da scheduling a home*
+- addaplinaces
+- deteleapplliances
 
 alejo:
-- EWH-scheduling, only power or not?? Ask also to stefan YES ONLY POWER IS FINE
-- (change scheduling append data on the page...), just sometime
-- add EV_flag for oldParameters and summary True/False
-- finish to modify deleteAppliances/addAppliance
----
-- the app have to return the message provided by the http response, for instance if the registration failed, the user will receive "new registration failed" 
-and maybe the new layouts/page is again the first one
-// response.data.responseFlag if 'True' -> as you are just doing 
-// elif 'False' -> only read message 
-// message is a new filed insiede response.data (response.data.message) 
-- connection again to websocket
+- the app have to return the message provided by the http response, 
+- (connection again to websocket) --> just presence not testing
 - (have we got control about the data that are inserted by the user) last point
-- add unit of measurement during presentaregistration and settings (°C)
-- addAppliances (settings): applianice name are: washing_machine, dishwahser, vacuum_clenear

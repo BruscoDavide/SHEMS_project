@@ -851,8 +851,8 @@ class SHEMS_main():
                             info = self.databaseClient.read_documents(collection_name='home_configuration', document={'_id': 3})
                             data['new_values']['Cess_thresh_low'] = info['batteries']['Cess_thresh_low']
                             data['new_values']['Cess_thresh_high'] = info['batteries']['Cess_thresh_high']
-                            data['new_values']['Cpev_thresh_low'] = info['batteries']['Cpev_thresh_low']
-                            data['new_values']['Cpev_thresh_high'] = info['batteries']['Cpev_thresh_high']
+                            data['new_values']['Cpev_thresh_low'] = info['batteries']['Cpev_thresh_low']*100
+                            data['new_values']['Cpev_thresh_high'] = info['batteries']['Cpev_thresh_high']*100
                             info = self.databaseClient.read_documents(collection_name='home_configuration', document={'_id': 7})
                             data['new_values']['Time_deperature'] = info['time']['time_dep']
 
@@ -933,7 +933,7 @@ class SHEMS_main():
                         logging.info(payload)
                         data = self.databaseClient.read_documents(collection_name='home_configuration', document={'_id': 4})
                         logging.info(data)
-                        if payload['name'] != 'Washing machine' and payload['name'] != 'Dishwasher' and payload['name'] != 'Vacuum cleaner':
+                        if payload['name'] != 'washing_machine' and payload['name'] != 'dishwasher' and payload['name'] != 'vacuum_cleaner':
                             data['appliances']['N_sched_appliances'] += 1
                             data['appliances']['sched_appliances']['name'].append(payload['name'])
                             running_len = payload['applianceData']['running_len']
@@ -1300,8 +1300,6 @@ class SHEMS_main():
                                         self.__append_data(code=timestamp, data=data)
                                         logging.info(f'New registration success, mathematical model active')
 
-
-                                        logging.info(self.shems.Tin_out)
                                     else:
                                         data = {}
                                         data['message'] = f'New registration success, mathematical model error, code = {cd}'
